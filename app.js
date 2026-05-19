@@ -11,6 +11,8 @@ let selectedRating = 8.0;
 let selectedPlace  = null;   // { placeId, name, address, city, country, lat, lng }
 let selectedPhoto  = null;   // File object
 let autocompleteSession = null;
+let editingVisitId  = null;   // null = new entry, string id = editing
+let existingPhotoUrl = null;  // used when editing an entry that already has a photo
 
 // ── Toast ────────────────────────────────────────────────────
 function toast(msg, type = '') {
@@ -172,8 +174,8 @@ async function loadRecent(uid) {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">🍕</div>
-          <div class="empty-title">No pies logged yet</div>
-          <div class="empty-body">Tap the + to log your first slice.</div>
+          <div class="empty-title">No pizzas logged yet</div>
+          <div class="empty-body">Tap + to log your first pizza.</div>
         </div>`;
       return;
     }
@@ -207,9 +209,133 @@ function entryCard(id, v) {
     </div>`;
 }
 
-function openEntry(id) {
-  // Phase 2: entry detail sheet
-  console.log('[Crust] open entry', id);
+// ── Entry Detail + Edit + Delete ─────────────────────────────
+let _detailVisitId   = null;
+let _detailVisitData = null;
+
+async function openEntry(id) {
+  if (!currentUser) return;
+  _detailVisitId = id;
+  _detailVisitData = null;
+
+  const overlay = document.getElementById('entry-detail-overlay');
+  const body    = document.getElementById('detail-body');
+  overlay.classList.remove('hidden');
+  body.innerHTML = '<div style="text-align:center;padding:48px;opacity:.35;font-size:14px;">Loading…</div>';
+
+  try {
+    const snap = await db.collection(`users/${currentUser.uid}/visits`).doc(id).get();
+    if (!snap.exists) {
+      overlay.classList.add('hidden');
+      toast('Entry not found', 'error');
+      return;
+    }
+    _detailVisitData = snap.data();
+    const v    = _detailVisitData;
+    const d    = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+    const dStr = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    const tags = (v.styles || []).map(s => `<span class="style-tag">${esc(s)}</span>`).join('');
+    const loc  = [v.city, v.country].filter(Boolean).join(', ');
+
+    body.innerHTML = `
+      ${v.photoUrl ? `<img src="${esc(v.photoUrl)}" class="detail-photo" />` : ''}
+      <div class="detail-place-name">${esc(v.placeName || 'Unknown')}</div>
+      ${loc ? `<div class="detail-location-line">${esc(loc)}</div>` : ''}
+      <div class="detail-meta-row">
+        <div class="detail-rating-big">${(v.rating ?? '—')}<span> / 10</span></div>
+        <div class="detail-date-str">${dStr}</div>
+      </div>
+      ${tags ? `<div class="detail-tags-row">${tags}</div>` : ''}
+      ${v.notes ? `<div class="detail-notes-box">${esc(v.notes)}</div>` : ''}
+    `;
+  } catch (e) {
+    console.error('openEntry:', e);
+    body.innerHTML = '<div style="text-align:center;padding:48px;opacity:.35;font-size:14px;">Couldn\'t load entry.</div>';
+  }
+}
+
+function closeEntryDetail() {
+  document.getElementById('entry-detail-overlay').classList.add('hidden');
+  _detailVisitId   = null;
+  _detailVisitData = null;
+}
+
+function startEditEntry() {
+  if (!_detailVisitId || !_detailVisitData) return;
+  const id = _detailVisitId;
+  const v  = _detailVisitData;
+
+  editingVisitId = id;
+  resetLog(); // clears state and resets form
+
+  // Pre-fill place
+  document.getElementById('place-input').value = v.placeName || '';
+  selectedPlace = {
+    placeId: v.placeId,
+    name:    v.placeName,
+    address: v.address || '',
+    city:    v.city    || '',
+    country: v.country || '',
+    lat:     v.lat     ?? null,
+    lng:     v.lng     ?? null,
+  };
+
+  // Show city/country row pre-filled
+  qv('override-city',    v.city    || '');
+  qv('override-country', v.country || '');
+  const locRow = document.getElementById('place-location-row');
+  if (locRow) locRow.classList.add('visible');
+
+  // Date
+  const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+  if (!isNaN(d)) {
+    qv('log-date', d.toISOString().split('T')[0]);
+  }
+
+  // Rating
+  selectedRating = v.rating ?? 8.0;
+  qv('rating-slider', selectedRating);
+  document.getElementById('rating-display').textContent = selectedRating.toFixed(1);
+
+  // Styles
+  selectedStyles = v.styles || [];
+  document.querySelectorAll('.style-chip').forEach(c => {
+    c.classList.toggle('on', selectedStyles.includes(c.dataset.style));
+  });
+
+  // Notes
+  qv('log-notes', v.notes || '');
+
+  // Existing photo
+  existingPhotoUrl = v.photoUrl || null;
+  if (v.photoUrl) {
+    const pa = document.getElementById('photo-area-inner');
+    if (pa) pa.innerHTML = `<img src="${esc(v.photoUrl)}" /><div class="photo-overlay">Tap to change</div>`;
+  }
+
+  // Update log screen title and button
+  const logTitle = document.getElementById('log-title');
+  if (logTitle) logTitle.textContent = 'Edit Entry';
+  const saveBtn = document.getElementById('save-btn');
+  if (saveBtn) saveBtn.textContent = 'Save Changes';
+
+  document.getElementById('entry-detail-overlay').classList.add('hidden');
+  navigate('log');
+}
+
+async function confirmDeleteEntry() {
+  if (!_detailVisitId) return;
+  if (!confirm('Delete this entry? This can\'t be undone.')) return;
+
+  try {
+    await db.collection(`users/${currentUser.uid}/visits`).doc(_detailVisitId).delete();
+    closeEntryDetail();
+    toast('Entry deleted.', 'success');
+    navigate('home');
+  } catch (e) {
+    console.error('deleteEntry:', e);
+    toast('Delete failed — try again.', 'error');
+  }
 }
 
 // ── Journey Screen (Phase 2 placeholder) ─────────────────────
@@ -240,10 +366,12 @@ function openLog() {
 }
 
 function resetLog() {
-  selectedStyles  = [];
-  selectedRating  = 8.0;
-  selectedPlace   = null;
-  selectedPhoto   = null;
+  selectedStyles   = [];
+  selectedRating   = 8.0;
+  selectedPlace    = null;
+  selectedPhoto    = null;
+  existingPhotoUrl = null;
+  editingVisitId   = null;
   autocompleteSession = null;
 
   const today = new Date().toISOString().split('T')[0];
@@ -260,6 +388,20 @@ function resetLog() {
   // Reset photo
   const pa = document.getElementById('photo-area-inner');
   if (pa) pa.innerHTML = photoAreaDefault();
+
+  // Reset save button (critical — fixes stuck "Saving…" bug on second entry)
+  const saveBtn = document.getElementById('save-btn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Pizza'; }
+
+  // Reset log title
+  const logTitle = document.getElementById('log-title');
+  if (logTitle) logTitle.textContent = 'Log a Pizza';
+
+  // Hide city/country override row
+  const locRow = document.getElementById('place-location-row');
+  if (locRow) locRow.classList.remove('visible');
+  qv('override-city', '');
+  qv('override-country', '');
 }
 
 function qv(id, val) {
@@ -371,6 +513,14 @@ async function selectPlace(placeId, name, sub) {
     console.warn('[Crust] Place details error:', e);
     // selectedPlace already set above — save will still work
   }
+
+  // Show editable city/country row so user can correct if Google got it wrong
+  const locRow = document.getElementById('place-location-row');
+  if (locRow) {
+    qv('override-city',    selectedPlace.city);
+    qv('override-country', selectedPlace.country);
+    locRow.classList.add('visible');
+  }
 }
 
 // ── Photo Handling ────────────────────────────────────────────
@@ -397,8 +547,8 @@ function photoAreaDefault() {
 async function saveEntry() {
   if (!currentUser) { toast('Not signed in', 'error'); return; }
 
-  const placeInput = document.getElementById('place-input').value.trim();
-  if (!placeInput) { toast('Add a place first', 'error'); return; }
+  const placeInputVal = document.getElementById('place-input').value.trim();
+  if (!placeInputVal) { toast('Add a place first', 'error'); return; }
 
   const dateInput = document.getElementById('log-date').value;
   if (!dateInput) { toast('Choose a date', 'error'); return; }
@@ -408,14 +558,17 @@ async function saveEntry() {
   saveBtn.textContent = 'Saving…';
 
   try {
-    const uid    = currentUser.uid;
-    const date   = firebase.firestore.Timestamp.fromDate(new Date(dateInput + 'T12:00:00'));
-    const notes  = document.getElementById('log-notes').value.trim();
+    const uid   = currentUser.uid;
+    const date  = firebase.firestore.Timestamp.fromDate(new Date(dateInput + 'T12:00:00'));
+    const notes = document.getElementById('log-notes').value.trim();
 
-    // Use selectedPlace if populated from autocomplete; otherwise minimal record
+    // City/country: honour manual overrides from the editable fields
+    const overrideCity    = document.getElementById('override-city')?.value.trim()    || '';
+    const overrideCountry = document.getElementById('override-country')?.value.trim() || '';
+
     const place = selectedPlace || {
       placeId:  'manual_' + Date.now(),
-      name:     placeInput,
+      name:     placeInputVal,
       address:  '',
       city:     '',
       country:  '',
@@ -423,71 +576,101 @@ async function saveEntry() {
       lng:      null,
     };
 
-    // Upload photo if present
-    let photoUrl = null;
+    const finalCity    = overrideCity    || place.city;
+    const finalCountry = overrideCountry || place.country;
+
+    // Photo: new upload wins; otherwise keep existing (for edit mode)
+    let photoUrl = existingPhotoUrl;
     if (selectedPhoto) {
-      const compressed = await compressPhoto(selectedPhoto);
-      const ref = storage.ref(`users/${uid}/photos/${Date.now()}.jpg`);
-      await ref.put(compressed, { contentType: 'image/jpeg' });
-      photoUrl = await ref.getDownloadURL();
+      try {
+        const compressed = await compressPhoto(selectedPhoto);
+        const ref = storage.ref(`users/${uid}/photos/${Date.now()}.jpg`);
+        // 30-second timeout — prevents infinite "Saving…" if network stalls
+        await Promise.race([
+          ref.put(compressed, { contentType: 'image/jpeg' }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Photo upload timed out')), 30000)
+          )
+        ]);
+        photoUrl = await ref.getDownloadURL();
+      } catch (photoErr) {
+        console.warn('[Crust] Photo upload failed:', photoErr);
+        toast('Photo upload failed — saving without photo.', 'error');
+        photoUrl = existingPhotoUrl;
+      }
     }
 
-    // Build visit document
     const visit = {
       placeId:   place.placeId,
       placeName: place.name,
       address:   place.address,
-      city:      place.city,
-      country:   place.country,
+      city:      finalCity,
+      country:   finalCountry,
       lat:       place.lat,
       lng:       place.lng,
       date,
       rating:    selectedRating,
       styles:    selectedStyles,
       notes,
-      photoUrl,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      photoUrl:  photoUrl || null,
     };
 
-    const batch = db.batch();
+    if (editingVisitId) {
+      // ── UPDATE existing entry ──────────────────────────────
+      visit.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection(`users/${uid}/visits`).doc(editingVisitId).update(visit);
 
-    // Add visit
-    const visitRef = db.collection(`users/${uid}/visits`).doc();
-    batch.set(visitRef, visit);
+      // Correct city/country on the place doc too
+      if (place.placeId) {
+        await db.collection(`users/${uid}/places`).doc(place.placeId)
+          .set({ city: finalCity, country: finalCountry }, { merge: true })
+          .catch(() => {});
+      }
 
-    // Upsert place doc (for Places screen)
-    const placeRef = db.collection(`users/${uid}/places`).doc(place.placeId);
-    batch.set(placeRef, {
-      placeId:       place.placeId,
-      name:          place.name,
-      address:       place.address,
-      city:          place.city,
-      country:       place.country,
-      lat:           place.lat,
-      lng:           place.lng,
-      lastVisited:   date,
-      visitCount:    firebase.firestore.FieldValue.increment(1),
-      isWishlist:    false,
-    }, { merge: true });
+      toast('Entry updated! ✓', 'success');
+      closeEntryDetail();
+      navigate('home');
 
-    // Track rating history
-    await placeRef.update({
-      ratingHistory: firebase.firestore.FieldValue.arrayUnion({
-        date:   dateInput,
-        rating: selectedRating,
-      }),
-    }).catch(() => {}); // placeRef may not exist yet — merge handles it
+    } else {
+      // ── CREATE new entry ───────────────────────────────────
+      visit.createdAt = firebase.firestore.FieldValue.serverTimestamp();
 
-    await batch.commit();
+      const batch    = db.batch();
+      const visitRef = db.collection(`users/${uid}/visits`).doc();
+      batch.set(visitRef, visit);
 
-    toast('Pie logged! 🍕', 'success');
-    navigate('home');
+      const placeRef = db.collection(`users/${uid}/places`).doc(place.placeId);
+      batch.set(placeRef, {
+        placeId:     place.placeId,
+        name:        place.name,
+        address:     place.address,
+        city:        finalCity,
+        country:     finalCountry,
+        lat:         place.lat,
+        lng:         place.lng,
+        lastVisited: date,
+        visitCount:  firebase.firestore.FieldValue.increment(1),
+        isWishlist:  false,
+      }, { merge: true });
+
+      await placeRef.update({
+        ratingHistory: firebase.firestore.FieldValue.arrayUnion({
+          date:   dateInput,
+          rating: selectedRating,
+        }),
+      }).catch(() => {});
+
+      await batch.commit();
+
+      toast('Pizza logged! 🍕', 'success');
+      navigate('home');
+    }
 
   } catch (e) {
     console.error('saveEntry:', e);
     toast('Save failed — try again.', 'error');
     saveBtn.disabled = false;
-    saveBtn.textContent = 'Save Pie';
+    saveBtn.textContent = 'Save Pizza';
   }
 }
 
