@@ -296,7 +296,7 @@ async function runAutocomplete(query) {
   const list = document.getElementById('autocomplete-list');
 
   // If no API key configured, hide dropdown silently
-  if (!window.PLACES_API_KEY || PLACES_API_KEY === 'YOUR_PLACES_API_KEY') return;
+  if (typeof PLACES_API_KEY === 'undefined' || PLACES_API_KEY === 'YOUR_PLACES_API_KEY') return;
 
   try {
     const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
