@@ -310,12 +310,12 @@ async function runAutocomplete(query) {
       },
       body: JSON.stringify({
         input: query,
-        includedPrimaryTypes: ['restaurant', 'food', 'bakery', 'cafe', 'meal_takeaway'],
       }),
     });
 
     if (!res.ok) { list.innerHTML = ''; return; }
     const data = await res.json();
+    console.log(data);
     const suggestions = data.suggestions || [];
 
     if (!suggestions.length) { list.innerHTML = ''; return; }
