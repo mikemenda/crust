@@ -310,6 +310,7 @@ async function runAutocomplete(query) {
       },
       body: JSON.stringify({
         input: query,
+          sessionToken: crypto.randomUUID()
       }),
     });
 
