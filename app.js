@@ -280,11 +280,13 @@ document.querySelectorAll('.style-chip').forEach(chip => {
 
 // ── Google Places Autocomplete (REST API — no JS SDK needed) ──
 // Uses Places API (New) directly via fetch. No script tag required.
+// Event delegation on document avoids DOM timing issues.
 
 let acDebounce;
 
-document.getElementById('place-input').addEventListener('input', function() {
-  const q = this.value.trim();
+document.addEventListener('input', function(e) {
+  if (e.target.id !== 'place-input') return;
+  const q = e.target.value.trim();
   if (q.length < 2) { document.getElementById('autocomplete-list').innerHTML = ''; return; }
   clearTimeout(acDebounce);
   acDebounce = setTimeout(() => runAutocomplete(q), 350);
