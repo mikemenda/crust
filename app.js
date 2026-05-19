@@ -359,6 +359,14 @@ function openLog() {
   if (placeInput) {
     placeInput.oninput = function() {
       const q = this.value.trim();
+      // Clear previous place selection and hide city/country row the moment
+      // the user edits the field — prevents the row from overlapping the dropdown
+      selectedPlace = null;
+      const locRow = document.getElementById('place-location-row');
+      if (locRow) locRow.classList.remove('visible');
+      qv('override-city', '');
+      qv('override-country', '');
+
       if (q.length >= 2) runAutocomplete(q);
       else document.getElementById('autocomplete-list').innerHTML = '';
     };
@@ -385,14 +393,11 @@ function resetLog() {
 
   document.querySelectorAll('.style-chip').forEach(c => c.classList.remove('on'));
 
-  // Reset photo area and clear the file input value
-  // (not clearing the input value can cause iOS to re-fire the change event)
+  // Reset photo
   const pa = document.getElementById('photo-area-inner');
   if (pa) pa.innerHTML = photoAreaDefault();
-  const photoInput = document.getElementById('photo-input');
-  if (photoInput) photoInput.value = '';
 
-  // Reset save button — always force both properties to ensure clean state
+  // Reset save button (critical — fixes stuck "Saving…" bug on second entry)
   const saveBtn = document.getElementById('save-btn');
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Pizza'; }
 
@@ -437,6 +442,7 @@ document.querySelectorAll('.style-chip').forEach(chip => {
 // Event delegation on document avoids DOM timing issues.
 
 let acDebounce;
+let _acSuggestions = []; // cache raw suggestions — onclick references by index to avoid apostrophe-escaping bugs
 
 // autocomplete is attached in openLog() each time the form opens
 
@@ -455,23 +461,27 @@ async function runAutocomplete(query) {
       },
       body: JSON.stringify({
         input: query,
-          sessionToken: crypto.randomUUID()
+        sessionToken: crypto.randomUUID()
       }),
     });
 
     if (!res.ok) { list.innerHTML = ''; return; }
     const data = await res.json();
-    console.log(data);
     const suggestions = data.suggestions || [];
 
     if (!suggestions.length) { list.innerHTML = ''; return; }
 
-    list.innerHTML = suggestions.slice(0, 5).map(s => {
-      const p = s.placePrediction;
+    // Store raw suggestions so selectPlaceByIndex() can read them safely —
+    // avoids passing name/address as escaped strings in onclick attributes,
+    // which breaks on apostrophes (e.g. "Joe's Pizza", "Mama's TOO!")
+    _acSuggestions = suggestions.slice(0, 5);
+
+    list.innerHTML = _acSuggestions.map((s, i) => {
+      const p    = s.placePrediction;
       const main = p.structuredFormat?.mainText?.text || p.text?.text || '';
       const sub  = p.structuredFormat?.secondaryText?.text || '';
       return `
-        <div class="autocomplete-item" onclick="selectPlace('${esc(p.placeId)}','${esc(main)}','${esc(sub)}')">
+        <div class="autocomplete-item" onclick="selectPlaceByIndex(${i})">
           <div class="place-name">${esc(main)}</div>
           <div class="place-sub">${esc(sub)}</div>
         </div>`;
@@ -481,6 +491,16 @@ async function runAutocomplete(query) {
     console.warn('[Crust] Autocomplete error:', e);
     list.innerHTML = '';
   }
+}
+
+// Reads from _acSuggestions by index — no string escaping risk
+function selectPlaceByIndex(i) {
+  const s = _acSuggestions[i];
+  if (!s) return;
+  const p    = s.placePrediction;
+  const main = p.structuredFormat?.mainText?.text || p.text?.text || '';
+  const sub  = p.structuredFormat?.secondaryText?.text || '';
+  selectPlace(p.placeId, main, sub);
 }
 
 // Called when user taps a suggestion
@@ -527,15 +547,6 @@ async function selectPlace(placeId, name, sub) {
 }
 
 // ── Photo Handling ────────────────────────────────────────────
-// Remove any capture attribute so iOS shows the full share sheet
-// (Camera, Photo Library, Files) instead of forcing camera only.
-(function fixPhotoInput() {
-  const input = document.getElementById('photo-input');
-  if (!input) return;
-  input.removeAttribute('capture');
-  input.setAttribute('accept', 'image/*');
-})();
-
 document.getElementById('photo-input').addEventListener('change', function() {
   if (!this.files[0]) return;
   selectedPhoto = this.files[0];
@@ -640,8 +651,6 @@ async function saveEntry() {
       }
 
       toast('Entry updated! ✓', 'success');
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save Pizza';
       closeEntryDetail();
       navigate('home');
 
@@ -677,8 +686,6 @@ async function saveEntry() {
       await batch.commit();
 
       toast('Pizza logged! 🍕', 'success');
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save Pizza';
       navigate('home');
     }
 
