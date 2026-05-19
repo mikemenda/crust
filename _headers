@@ -1,0 +1,10 @@
+# ============================================================
+# CRUST — Netlify Headers
+# Prevents Netlify's CDN from caching the service worker.
+# Without this, iOS PWA users get stale SW even after redeploy.
+# ============================================================
+
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
