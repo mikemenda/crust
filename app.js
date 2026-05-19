@@ -278,100 +278,93 @@ document.querySelectorAll('.style-chip').forEach(chip => {
   });
 });
 
-// ── Google Places Autocomplete ────────────────────────────────
-// NOTE: Autocomplete wires up when PLACES_API_KEY is set in firebase-config.js.
-// The Places API script is loaded dynamically so the key is included.
-
-let placesService = null;
-
-function initPlaces() {
-  if (!window.PLACES_API_KEY || PLACES_API_KEY === 'YOUR_PLACES_API_KEY') return;
-  const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${PLACES_API_KEY}&libraries=places&callback=onPlacesReady`;
-  script.async = true;
-  document.head.appendChild(script);
-}
-window.onPlacesReady = function() {
-  placesService = new google.maps.places.AutocompleteService();
-};
-// Init on load
-window.addEventListener('load', initPlaces);
+// ── Google Places Autocomplete (REST API — no JS SDK needed) ──
+// Uses Places API (New) directly via fetch. No script tag required.
 
 let acDebounce;
+
 document.getElementById('place-input').addEventListener('input', function() {
   const q = this.value.trim();
-  if (!q) { document.getElementById('autocomplete-list').innerHTML = ''; return; }
+  if (q.length < 2) { document.getElementById('autocomplete-list').innerHTML = ''; return; }
   clearTimeout(acDebounce);
-  acDebounce = setTimeout(() => runAutocomplete(q), 300);
+  acDebounce = setTimeout(() => runAutocomplete(q), 350);
 });
 
-function runAutocomplete(query) {
+async function runAutocomplete(query) {
   const list = document.getElementById('autocomplete-list');
-  if (!placesService) {
+
+  // If no API key configured, hide dropdown silently
+  if (!window.PLACES_API_KEY || PLACES_API_KEY === 'YOUR_PLACES_API_KEY') return;
+
+  try {
+    const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': PLACES_API_KEY,
+      },
+      body: JSON.stringify({
+        input: query,
+        includedPrimaryTypes: ['restaurant', 'food', 'bakery', 'cafe', 'meal_takeaway', 'meal_delivery'],
+      }),
+    });
+
+    if (!res.ok) { list.innerHTML = ''; return; }
+    const data = await res.json();
+    const suggestions = data.suggestions || [];
+
+    if (!suggestions.length) { list.innerHTML = ''; return; }
+
+    list.innerHTML = suggestions.slice(0, 5).map(s => {
+      const p = s.placePrediction;
+      const main = p.structuredFormat?.mainText?.text || p.text?.text || '';
+      const sub  = p.structuredFormat?.secondaryText?.text || '';
+      return `
+        <div class="autocomplete-item" onclick="selectPlace('${esc(p.placeId)}','${esc(main)}','${esc(sub)}')">
+          <div class="place-name">${esc(main)}</div>
+          <div class="place-sub">${esc(sub)}</div>
+        </div>`;
+    }).join('');
+
+  } catch (e) {
+    console.warn('[Crust] Autocomplete error:', e);
     list.innerHTML = '';
-    return;
   }
-  placesService.getPlacePredictions(
-    { input: query, types: ['establishment'], sessionToken: getACSession() },
-    (predictions, status) => {
-      if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
-        list.innerHTML = '';
-        return;
-      }
-      list.innerHTML = predictions.slice(0,5).map(p => `
-        <div class="autocomplete-item" onclick="selectPlace('${esc(p.place_id)}','${esc(p.structured_formatting.main_text)}','${esc(p.description)}')">
-          <div class="place-name">${esc(p.structured_formatting.main_text)}</div>
-          <div class="place-sub">${esc(p.structured_formatting.secondary_text || '')}</div>
-        </div>`).join('');
-    }
-  );
 }
 
-function getACSession() {
-  if (!autocompleteSession && window.google) {
-    autocompleteSession = new google.maps.places.AutocompleteSessionToken();
-  }
-  return autocompleteSession;
-}
-
-// Called when user picks from dropdown
-function selectPlace(placeId, name, description) {
+// Called when user taps a suggestion
+async function selectPlace(placeId, name, sub) {
   document.getElementById('place-input').value = name;
   document.getElementById('autocomplete-list').innerHTML = '';
 
-  if (!window.google) {
-    // Fallback: store just name/description (no coordinates)
-    selectedPlace = { placeId, name, address: description, city: '', country: '', lat: null, lng: null };
-    return;
-  }
+  // Store minimal record immediately so save works even if details fail
+  selectedPlace = { placeId, name, address: sub, city: '', country: '', lat: null, lng: null };
 
-  // Fetch full place details to get coordinates, city, country
-  const mapDiv = document.createElement('div');
-  const svc = new google.maps.places.PlacesService(mapDiv);
-  svc.getDetails(
-    {
+  // Fetch full details: coordinates, city, country
+  try {
+    const res = await fetch(
+      `https://places.googleapis.com/v1/places/${placeId}?fields=displayName,formattedAddress,location,addressComponents`,
+      { headers: { 'X-Goog-Api-Key': PLACES_API_KEY } }
+    );
+    if (!res.ok) return;
+    const place = await res.json();
+
+    const comps  = place.addressComponents || [];
+    const find   = type => (comps.find(c => c.types?.includes(type)) || {}).longText || '';
+
+    selectedPlace = {
       placeId,
-      fields: ['name','formatted_address','geometry','address_components'],
-      sessionToken: autocompleteSession
-    },
-    (place, status) => {
-      autocompleteSession = null; // session used
-      if (status !== google.maps.places.PlacesServiceStatus.OK) return;
-
-      const comps = place.address_components || [];
-      const find  = type => (comps.find(c => c.types.includes(type)) || {}).long_name || '';
-
-      selectedPlace = {
-        placeId,
-        name:    place.name,
-        address: place.formatted_address,
-        city:    find('locality') || find('administrative_area_level_2'),
-        country: find('country'),
-        lat:     place.geometry?.location?.lat() ?? null,
-        lng:     place.geometry?.location?.lng() ?? null,
-      };
-    }
-  );
+      name:    place.displayName?.text || name,
+      address: place.formattedAddress || sub,
+      city:    find('locality') || find('administrative_area_level_2'),
+      country: find('country'),
+      lat:     place.location?.latitude  ?? null,
+      lng:     place.location?.longitude ?? null,
+    };
+  } catch (e) {
+    console.warn('[Crust] Place details error:', e);
+    // selectedPlace already set above — save will still work
+  }
 }
 
 // ── Photo Handling ────────────────────────────────────────────
