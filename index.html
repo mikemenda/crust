@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <!-- PWA / iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Crust">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#141414">
+  <meta name="description" content="Crust — The pizza passport. Track every pie, everywhere.">
+
+  <title>Crust</title>
+
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+
+  <!-- Outfit font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LOADING
+════════════════════════════════════════════════════════════ -->
+<div id="loading-overlay">
+  <div class="loading-pizza">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="60" height="60">
+      <path d="M 40 50 L 63 34 A 28 28 0 1 0 63 66 Z" fill="#F0EAD6"/>
+      <path d="M 63 34 A 28 28 0 1 0 63 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <circle cx="26" cy="42" r="3"   fill="#D85A30"/>
+      <circle cx="22" cy="55" r="2.4" fill="#D85A30"/>
+      <circle cx="40" cy="35" r="2.4" fill="#D85A30"/>
+      <circle cx="37" cy="63" r="2.4" fill="#D85A30"/>
+      <path d="M 64 50 L 87 34 A 28 28 0 0 1 87 66 Z" fill="#F0EAD6"/>
+      <path d="M 87 34 A 28 28 0 0 1 87 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <circle cx="76" cy="44" r="2.2" fill="#D85A30"/>
+      <circle cx="77" cy="57" r="2.2" fill="#D85A30"/>
+    </svg>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     AUTH SCREEN
+════════════════════════════════════════════════════════════ -->
+<div id="auth-screen">
+
+  <div class="auth-logo">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="80" height="80">
+      <path d="M 40 50 L 63 34 A 28 28 0 1 0 63 66 Z" fill="#F0EAD6"/>
+      <path d="M 63 34 A 28 28 0 1 0 63 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <circle cx="26" cy="42" r="3"   fill="#D85A30"/>
+      <circle cx="22" cy="55" r="2.4" fill="#D85A30"/>
+      <circle cx="40" cy="35" r="2.4" fill="#D85A30"/>
+      <circle cx="37" cy="63" r="2.4" fill="#D85A30"/>
+      <path d="M 64 50 L 87 34 A 28 28 0 0 1 87 66 Z" fill="#F0EAD6"/>
+      <path d="M 87 34 A 28 28 0 0 1 87 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <circle cx="76" cy="44" r="2.2" fill="#D85A30"/>
+      <circle cx="77" cy="57" r="2.2" fill="#D85A30"/>
+    </svg>
+  </div>
+
+  <h1 class="auth-wordmark">CRUST</h1>
+  <p class="auth-tagline">The pizza passport</p>
+
+  <button id="google-signin-btn" class="btn-google">
+    <!-- Google G -->
+    <svg width="18" height="18" viewBox="0 0 24 24">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+    Continue with Google
+  </button>
+
+  <p class="auth-footnote">Your pies. Your passport. Your data.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN APP
+════════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none; flex-direction:column;">
+
+  <!-- ─── HOME ──────────────────────────────────────────── -->
+  <div id="screen-home" class="screen active">
+
+    <header class="app-header">
+      <div class="header-left">
+        <span class="wordmark" style="font-size:18px; letter-spacing:3.5px;">CRUST</span>
+      </div>
+      <div id="avatar-wrap">
+        <div class="avatar-initial">?</div>
+      </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Pies</div>
+        <div class="stat-num" id="stat-pies">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Spots</div>
+        <div class="stat-num" id="stat-spots">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Cities</div>
+        <div class="stat-num" id="stat-cities">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Countries</div>
+        <div class="stat-num" id="stat-countries">—</div>
+      </div>
+      <!-- Streak — full width -->
+      <div class="stat-card streak">
+        <div class="streak-emoji">🔥</div>
+        <div class="streak-body">
+          <div class="streak-num" id="stat-streak">—</div>
+          <div class="streak-title">Sunday Streak</div>
+          <div class="streak-status" id="streak-status">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent entries -->
+    <div class="section-header">
+      <span class="section-label">Recent</span>
+      <button class="btn-see-all" onclick="navigate('journey')">See all</button>
+    </div>
+
+    <div id="recent-entries" class="entry-feed">
+      <!-- Skeleton placeholders -->
+      <div class="entry-card" style="pointer-events:none">
+        <div class="entry-thumb-placeholder skel" style="background:none;border-radius:8px;"></div>
+        <div class="entry-body">
+          <div class="skel" style="height:15px;width:65%;margin-bottom:6px;"></div>
+          <div class="skel" style="height:11px;width:42%;margin-bottom:8px;"></div>
+          <div class="skel" style="height:16px;width:52px;border-radius:20px;"></div>
+        </div>
+      </div>
+      <div class="entry-card" style="pointer-events:none">
+        <div class="entry-thumb-placeholder skel" style="background:none;border-radius:8px;"></div>
+        <div class="entry-body">
+          <div class="skel" style="height:15px;width:50%;margin-bottom:6px;"></div>
+          <div class="skel" style="height:11px;width:38%;margin-bottom:8px;"></div>
+          <div class="skel" style="height:16px;width:52px;border-radius:20px;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /home -->
+
+  <!-- ─── LOG ───────────────────────────────────────────── -->
+  <div id="screen-log" class="screen">
+
+    <div class="log-header">
+      <span class="log-title">Log a Pie</span>
+      <button class="btn-icon" id="log-close-btn" aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="log-scroll">
+
+      <!-- Place -->
+      <div class="form-block">
+        <label class="form-label">Place</label>
+        <input type="text" id="place-input" class="form-input"
+          placeholder="Search pizzeria…" autocomplete="off" autocorrect="off" spellcheck="false">
+        <input type="hidden" id="place-hidden">
+        <div id="autocomplete-list"></div>
+      </div>
+
+      <!-- Date -->
+      <div class="form-block">
+        <label class="form-label">Date</label>
+        <input type="date" id="log-date" class="form-input">
+      </div>
+
+      <!-- Rating -->
+      <div class="form-block">
+        <label class="form-label">Rating</label>
+        <div class="rating-row">
+          <div class="rating-big" id="rating-display">8.0</div>
+          <input type="range" id="rating-slider" class="rating-slider"
+            min="1" max="10" step="0.5" value="8">
+          <span class="rating-max">10</span>
+        </div>
+      </div>
+
+      <!-- Style -->
+      <div class="form-block">
+        <label class="form-label">Style <span class="optional">— pick any</span></label>
+        <div class="style-grid">
+          <button class="style-chip" data-style="New York">New York</button>
+          <button class="style-chip" data-style="Detroit">Detroit</button>
+          <button class="style-chip" data-style="Deep Dish">Deep Dish</button>
+          <button class="style-chip" data-style="Tavern Style">Tavern</button>
+          <button class="style-chip" data-style="Neapolitan">Neapolitan</button>
+          <button class="style-chip" data-style="Sicilian">Sicilian</button>
+          <button class="style-chip" data-style="Al Taglio">Al Taglio</button>
+          <button class="style-chip" data-style="Pan Pizza">Pan</button>
+          <button class="style-chip" data-style="Other">Other</button>
+        </div>
+      </div>
+
+      <!-- Photo -->
+      <div class="form-block">
+        <label class="form-label">Photo <span class="optional">— optional</span></label>
+        <div class="photo-area" id="photo-area">
+          <div id="photo-area-inner" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span>Add photo</span>
+          </div>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none">
+      </div>
+
+      <!-- Notes -->
+      <div class="form-block">
+        <label class="form-label">Notes <span class="optional">— optional</span></label>
+        <textarea id="log-notes" class="form-input" rows="3"
+          placeholder="What you ordered, who you were with, thoughts…"></textarea>
+      </div>
+
+      <!-- Save -->
+      <div class="log-footer">
+        <button class="btn-save" id="save-btn">Save Pie</button>
+      </div>
+
+    </div><!-- /log-scroll -->
+  </div><!-- /log -->
+
+  <!-- ─── JOURNEY ───────────────────────────────────────── -->
+  <div id="screen-journey" class="screen">
+    <header class="app-header">
+      <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Journey</span>
+    </header>
+    <div class="screen-shell">
+      <div class="shell-icon">📋</div>
+      <p class="shell-text">Full chronological log.<br>Every pie, in order.<br><em style="opacity:.6">Phase 2</em></p>
+    </div>
+  </div>
+
+  <!-- ─── PLACES ────────────────────────────────────────── -->
+  <div id="screen-places" class="screen">
+    <header class="app-header">
+      <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Places</span>
+    </header>
+    <div class="screen-shell">
+      <div class="shell-icon">📍</div>
+      <p class="shell-text">Every spot you've visited.<br>Sorted, filtered, revisitable.<br><em style="opacity:.6">Phase 2</em></p>
+    </div>
+  </div>
+
+  <!-- ─── PASSPORT ──────────────────────────────────────── -->
+  <div id="screen-passport" class="screen">
+    <header class="app-header">
+      <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Passport</span>
+    </header>
+    <div class="screen-shell">
+      <div class="shell-icon">🛂</div>
+      <p class="shell-text">Stats hub. Charts, rankings,<br>your pizza year in review.<br><em style="opacity:.6">Phase 2</em></p>
+    </div>
+  </div>
+
+  <!-- ─── BOTTOM NAV ────────────────────────────────────── -->
+  <nav class="bottom-nav">
+
+    <!-- Home -->
+    <button class="nav-btn active" data-screen="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      <span class="nav-label">Home</span>
+    </button>
+
+    <!-- Journey -->
+    <button class="nav-btn" data-screen="journey">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="8"  y1="6"  x2="21" y2="6"/>
+        <line x1="8"  y1="12" x2="21" y2="12"/>
+        <line x1="8"  y1="18" x2="21" y2="18"/>
+        <line x1="3"  y1="6"  x2="3.01" y2="6"/>
+        <line x1="3"  y1="12" x2="3.01" y2="12"/>
+        <line x1="3"  y1="18" x2="3.01" y2="18"/>
+      </svg>
+      <span class="nav-label">Journey</span>
+    </button>
+
+    <!-- Log FAB -->
+    <button class="nav-fab" data-screen="log" aria-label="Log a pie">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5"  y1="12" x2="19" y2="12"/>
+      </svg>
+    </button>
+
+    <!-- Places -->
+    <button class="nav-btn" data-screen="places">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      <span class="nav-label">Places</span>
+    </button>
+
+    <!-- Passport -->
+    <button class="nav-btn" data-screen="passport">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+        <circle cx="12" cy="10" r="3"/>
+        <path d="M7 21v-1a5 5 0 0 1 10 0v1"/>
+      </svg>
+      <span class="nav-label">Passport</span>
+    </button>
+
+  </nav>
+
+</div><!-- /app -->
+
+<!-- ─── Firebase SDK ─────────────────────────────────────── -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+
+<script src="/firebase-config.js"></script>
+<script src="/app.js"></script>
+
+</body>
+</html>
