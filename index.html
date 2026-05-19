@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
   <!-- PWA / iOS -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Crust">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#141414">
-  <meta name="description" content="Crust — The pizza passport. Track every pie, everywhere.">
+  <meta name="description" content="Crust — The pizza passport. Track every pizza, everywhere.">
 
   <title>Crust</title>
 
@@ -23,6 +23,161 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="/styles.css">
+  <style>
+    /* ── City/country editable row ─────────────────────────── */
+    .place-location-row {
+      display: none;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .place-location-row.visible { display: flex; }
+    .location-field {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .location-label {
+      font-size: 10px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: rgba(240,234,214,0.38);
+      padding-left: 2px;
+    }
+    .location-input {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 9px 12px;
+      color: #F0EAD6;
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .location-input:focus {
+      outline: none;
+      border-color: #C8A97E;
+    }
+
+    /* ── Entry detail overlay ──────────────────────────────── */
+    .detail-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(0,0,0,0.72);
+      display: flex;
+      align-items: flex-end;
+      animation: fadeIn .18s ease;
+    }
+    .detail-overlay.hidden { display: none; }
+    @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+    .detail-sheet {
+      background: #1c1c1c;
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      animation: slideUp .22s ease;
+    }
+    @keyframes slideUp { from { transform:translateY(40px); opacity:0 } to { transform:none; opacity:1 } }
+    .detail-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .detail-action-btns {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-detail-edit {
+      background: #C8A97E;
+      color: #141414;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+    }
+    .btn-detail-delete {
+      background: transparent;
+      color: #D85A30;
+      border: 1.5px solid rgba(216,90,48,0.5);
+      border-radius: 20px;
+      padding: 8px 18px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .detail-scroll {
+      overflow-y: auto;
+      padding: 20px 20px 40px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .detail-photo {
+      width: 100%;
+      border-radius: 14px;
+      margin-bottom: 18px;
+      object-fit: cover;
+      max-height: 240px;
+    }
+    .detail-place-name {
+      font-size: 20px;
+      font-weight: 500;
+      color: #F0EAD6;
+      margin-bottom: 3px;
+      line-height: 1.25;
+    }
+    .detail-location-line {
+      font-size: 13px;
+      color: rgba(240,234,214,0.45);
+      margin-bottom: 18px;
+    }
+    .detail-meta-row {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .detail-rating-big {
+      font-size: 32px;
+      font-weight: 300;
+      color: #C8A97E;
+      line-height: 1;
+    }
+    .detail-rating-big span {
+      font-size: 16px;
+      opacity: .45;
+    }
+    .detail-date-str {
+      font-size: 13px;
+      color: rgba(240,234,214,0.55);
+    }
+    .detail-tags-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .detail-notes-box {
+      font-size: 14px;
+      color: rgba(240,234,214,0.72);
+      line-height: 1.65;
+      white-space: pre-wrap;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      margin-top: 4px;
+    }
+  </style>
 </head>
 <body>
 
@@ -83,7 +238,7 @@
     Continue with Google
   </button>
 
-  <p class="auth-footnote">Your pies. Your passport. Your data.</p>
+  <p class="auth-footnote">Your pizzas. Your passport. Your data.</p>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -106,7 +261,7 @@
     <!-- Stats -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Pies</div>
+        <div class="stat-label">Pizzas</div>
         <div class="stat-num" id="stat-pies">—</div>
       </div>
       <div class="stat-card">
@@ -164,7 +319,7 @@
   <div id="screen-log" class="screen">
 
     <div class="log-header">
-      <span class="log-title">Log a Pie</span>
+      <span class="log-title" id="log-title">Log a Pizza</span>
       <button class="btn-icon" id="log-close-btn" aria-label="Close">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -181,6 +336,16 @@
           placeholder="Search pizzeria…" autocomplete="off" autocorrect="off" spellcheck="false">
         <input type="hidden" id="place-hidden">
         <div id="autocomplete-list"></div>
+        <div id="place-location-row" class="place-location-row">
+          <div class="location-field">
+            <span class="location-label">City</span>
+            <input type="text" id="override-city" class="location-input" placeholder="City">
+          </div>
+          <div class="location-field">
+            <span class="location-label">Country</span>
+            <input type="text" id="override-country" class="location-input" placeholder="Country">
+          </div>
+        </div>
       </div>
 
       <!-- Date -->
@@ -195,7 +360,7 @@
         <div class="rating-row">
           <div class="rating-big" id="rating-display">8.0</div>
           <input type="range" id="rating-slider" class="rating-slider"
-            min="1" max="10" step="0.5" value="8">
+            min="1" max="10" step="0.1" value="8">
           <span class="rating-max">10</span>
         </div>
       </div>
@@ -204,14 +369,14 @@
       <div class="form-block">
         <label class="form-label">Style <span class="optional">— pick any</span></label>
         <div class="style-grid">
-          <button class="style-chip" data-style="New York">New York</button>
-          <button class="style-chip" data-style="Detroit">Detroit</button>
-          <button class="style-chip" data-style="Deep Dish">Deep Dish</button>
-          <button class="style-chip" data-style="Tavern Style">Tavern</button>
-          <button class="style-chip" data-style="Neapolitan">Neapolitan</button>
-          <button class="style-chip" data-style="Sicilian">Sicilian</button>
           <button class="style-chip" data-style="Al Taglio">Al Taglio</button>
-          <button class="style-chip" data-style="Pan Pizza">Pan</button>
+          <button class="style-chip" data-style="Deep Dish">Deep Dish</button>
+          <button class="style-chip" data-style="Detroit">Detroit</button>
+          <button class="style-chip" data-style="Neapolitan">Neapolitan</button>
+          <button class="style-chip" data-style="New York">New York</button>
+          <button class="style-chip" data-style="Pan Pizza">Pan Pizza</button>
+          <button class="style-chip" data-style="Sicilian">Sicilian</button>
+          <button class="style-chip" data-style="Tavern Style">Tavern Style</button>
           <button class="style-chip" data-style="Other">Other</button>
         </div>
       </div>
@@ -228,7 +393,7 @@
             <span>Add photo</span>
           </div>
         </div>
-        <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none">
+        <input type="file" id="photo-input" accept="image/*" style="display:none">
       </div>
 
       <!-- Notes -->
@@ -240,7 +405,7 @@
 
       <!-- Save -->
       <div class="log-footer">
-        <button class="btn-save" id="save-btn">Save Pie</button>
+        <button class="btn-save" id="save-btn">Save Pizza</button>
       </div>
 
     </div><!-- /log-scroll -->
@@ -253,7 +418,7 @@
     </header>
     <div class="screen-shell">
       <div class="shell-icon">📋</div>
-      <p class="shell-text">Full chronological log.<br>Every pie, in order.<br><em style="opacity:.6">Phase 2</em></p>
+      <p class="shell-text">Full chronological log.<br>Every pizza, in order.<br><em style="opacity:.6">Phase 2</em></p>
     </div>
   </div>
 
@@ -305,7 +470,7 @@
     </button>
 
     <!-- Log FAB -->
-    <button class="nav-fab" data-screen="log" aria-label="Log a pie">
+    <button class="nav-fab" data-screen="log" aria-label="Log a pizza">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
         <line x1="12" y1="5" x2="12" y2="19"/>
         <line x1="5"  y1="12" x2="19" y2="12"/>
@@ -332,6 +497,26 @@
     </button>
 
   </nav>
+
+  <!-- ─── ENTRY DETAIL OVERLAY ─────────────────────────── -->
+  <div id="entry-detail-overlay" class="detail-overlay hidden">
+    <div class="detail-sheet">
+      <div class="detail-topbar">
+        <button class="btn-icon" onclick="closeEntryDetail()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <div class="detail-action-btns">
+          <button class="btn-detail-edit" onclick="startEditEntry()">Edit</button>
+          <button class="btn-detail-delete" onclick="confirmDeleteEntry()">Delete</button>
+        </div>
+      </div>
+      <div class="detail-scroll" id="detail-body">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
 
 </div><!-- /app -->
 
