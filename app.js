@@ -385,11 +385,14 @@ function resetLog() {
 
   document.querySelectorAll('.style-chip').forEach(c => c.classList.remove('on'));
 
-  // Reset photo
+  // Reset photo area and clear the file input value
+  // (not clearing the input value can cause iOS to re-fire the change event)
   const pa = document.getElementById('photo-area-inner');
   if (pa) pa.innerHTML = photoAreaDefault();
+  const photoInput = document.getElementById('photo-input');
+  if (photoInput) photoInput.value = '';
 
-  // Reset save button (critical — fixes stuck "Saving…" bug on second entry)
+  // Reset save button — always force both properties to ensure clean state
   const saveBtn = document.getElementById('save-btn');
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Pizza'; }
 
@@ -524,6 +527,15 @@ async function selectPlace(placeId, name, sub) {
 }
 
 // ── Photo Handling ────────────────────────────────────────────
+// Remove any capture attribute so iOS shows the full share sheet
+// (Camera, Photo Library, Files) instead of forcing camera only.
+(function fixPhotoInput() {
+  const input = document.getElementById('photo-input');
+  if (!input) return;
+  input.removeAttribute('capture');
+  input.setAttribute('accept', 'image/*');
+})();
+
 document.getElementById('photo-input').addEventListener('change', function() {
   if (!this.files[0]) return;
   selectedPhoto = this.files[0];
@@ -628,6 +640,8 @@ async function saveEntry() {
       }
 
       toast('Entry updated! ✓', 'success');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Pizza';
       closeEntryDetail();
       navigate('home');
 
@@ -663,6 +677,8 @@ async function saveEntry() {
       await batch.commit();
 
       toast('Pizza logged! 🍕', 'success');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Pizza';
       navigate('home');
     }
 
