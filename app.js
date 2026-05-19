@@ -724,7 +724,7 @@ document.getElementById('photo-area').addEventListener('click', () =>
 // ── Service Worker ────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker.register('sw.js')
       .then(r => console.log('[Crust] SW registered:', r.scope))
       .catch(e => console.warn('[Crust] SW failed:', e));
   });
