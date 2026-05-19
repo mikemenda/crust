@@ -310,7 +310,7 @@ async function runAutocomplete(query) {
       },
       body: JSON.stringify({
         input: query,
-        includedPrimaryTypes: ['restaurant', 'food', 'bakery', 'cafe', 'meal_takeaway', 'meal_delivery'],
+        includedPrimaryTypes: ['restaurant', 'food', 'bakery', 'cafe', 'meal_takeaway'],
       }),
     });
 
