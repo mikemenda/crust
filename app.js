@@ -13,6 +13,7 @@ let selectedPhoto  = null;   // File object
 let autocompleteSession = null;
 let editingVisitId  = null;   // null = new entry, string id = editing
 let existingPhotoUrl = null;  // used when editing an entry that already has a photo
+let _streakStartDate = null;  // loaded from Firestore settings
 
 // ── Toast ────────────────────────────────────────────────────
 function toast(msg, type = '') {
@@ -94,14 +95,19 @@ async function loadHome() {
 
 async function loadStats(uid) {
   try {
-    const snap = await db.collection(`users/${uid}/visits`).get();
-    const visits = snap.docs.map(d => d.data());
+    const [visitsSnap, settingsSnap] = await Promise.all([
+      db.collection(`users/${uid}/visits`).get(),
+      db.collection(`users/${uid}/settings`).doc('streakSettings').get().catch(() => null),
+    ]);
+    const visits = visitsSnap.docs.map(d => d.data());
+    _streakStartDate = (settingsSnap && settingsSnap.exists)
+      ? (settingsSnap.data().startDate || null) : null;
 
     const pies      = visits.length;
     const spots     = new Set(visits.map(v => v.placeId).filter(Boolean)).size;
     const cities    = new Set(visits.map(v => v.city).filter(Boolean)).size;
     const countries = new Set(visits.map(v => v.country).filter(Boolean)).size;
-    const streak    = calcSundayStreak(visits);
+    const streak    = calcSundayStreak(visits, _streakStartDate);
 
     set('stat-pies',      pies);
     set('stat-spots',     spots);
@@ -128,12 +134,15 @@ function streakLabel(n) {
 // Sunday streak: counts consecutive Sundays with at least one logged visit,
 // walking backward from the most recent Sunday (or today if today is Sunday).
 // Backdating always allowed — streak recalculates from all stored data.
-function calcSundayStreak(visits) {
+// startDate (YYYY-MM-DD string) optionally ignores Sundays before that date.
+function calcSundayStreak(visits, startDate = null) {
+  const startMs = startDate ? new Date(startDate + 'T00:00:00').getTime() : 0;
   // Build a set of "YYYY-MM-DD" keys for all visit dates that are Sundays
   const sundaySet = new Set();
   visits.forEach(v => {
     const d = v.date?.toDate ? v.date.toDate() : (v.date ? new Date(v.date) : null);
     if (!d || isNaN(d)) return;
+    if (startDate && d.getTime() < startMs) return;
     if (d.getDay() === 0) sundaySet.add(ymd(d));
   });
   if (!sundaySet.size) return 0;
@@ -167,7 +176,7 @@ async function loadRecent(uid) {
   try {
     const snap = await db.collection(`users/${uid}/visits`)
       .orderBy('date', 'desc')
-      .limit(4)
+      .limit(5)
       .get();
 
     if (snap.empty) {
@@ -179,32 +188,48 @@ async function loadRecent(uid) {
         </div>`;
       return;
     }
-    container.innerHTML = snap.docs.map(d => entryCard(d.id, d.data())).join('');
+    container.innerHTML = snap.docs.map(d => entryCard(d.id, d.data(), 'open-place')).join('');
+    initSwipeCards();
   } catch (e) {
     console.error('loadRecent:', e);
     container.innerHTML = `<div class="empty-state"><div class="empty-body">Couldn't load entries.</div></div>`;
   }
 }
 
-function entryCard(id, v) {
+// context = 'open-place' → tap opens the restaurant/place detail (used on Home)
+// context = 'open-entry' → tap opens the individual visit detail (used on Journey & Place detail)
+function entryCard(id, v, context = 'open-entry') {
   const d    = v.date?.toDate ? v.date.toDate() : new Date(v.date);
   const dStr = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
   const tags = (v.styles || []).slice(0,2).map(s => `<span class="style-tag">${esc(s)}</span>`).join('');
   const thumb = v.photoUrl
     ? `<img src="${esc(v.photoUrl)}" class="entry-thumb" loading="lazy" />`
     : `<div class="entry-thumb-placeholder">🍕</div>`;
+  const tapFn = (context === 'open-place' && v.placeId)
+    ? `openPlace('${esc(v.placeId)}')`
+    : `openEntry('${id}')`;
 
   return `
-    <div class="entry-card" onclick="openEntry('${id}')">
-      ${thumb}
-      <div class="entry-body">
-        <div class="entry-place">${esc(v.placeName || 'Unknown')}</div>
-        <div class="entry-sub">${esc(v.city || '')}${v.city && dStr ? ' · ' : ''}${dStr}</div>
-        <div class="entry-tags">${tags}</div>
+    <div class="swipe-wrapper" data-entry-id="${id}">
+      <div class="swipe-reveal swipe-reveal-edit">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit
       </div>
-      <div class="entry-right">
-        <div class="entry-rating-num">${v.rating ?? '—'}</div>
-        <div class="entry-rating-denom">/ 10</div>
+      <div class="swipe-reveal swipe-reveal-delete">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        Delete
+      </div>
+      <div class="entry-card" onclick="${tapFn}">
+        ${thumb}
+        <div class="entry-body">
+          <div class="entry-place">${esc(v.placeName || 'Unknown')}</div>
+          <div class="entry-sub">${esc(v.city || '')}${v.city && dStr ? ' · ' : ''}${dStr}</div>
+          <div class="entry-tags">${tags}</div>
+        </div>
+        <div class="entry-right">
+          <div class="entry-rating-num">${v.rating ?? '—'}</div>
+          <div class="entry-rating-denom">/ 10</div>
+        </div>
       </div>
     </div>`;
 }
@@ -319,7 +344,9 @@ function startEditEntry() {
   const saveBtn = document.getElementById('save-btn');
   if (saveBtn) saveBtn.textContent = 'Save Changes';
 
-  document.getElementById('entry-detail-overlay').classList.add('hidden');
+  // Close both overlays (edit can be triggered from entry detail OR swipe in place detail)
+  document.getElementById('entry-detail-overlay')?.classList.add('hidden');
+  document.getElementById('place-detail-overlay')?.classList.add('hidden');
   navigate('log');
 }
 
@@ -366,8 +393,8 @@ async function loadJourney() {
 }
 
 function buildJourneyFilterOpts() {
-  _journeyFilterOpts.cities    = [...new Set(_journeyVisits.map(v => v.city).filter(Boolean))].sort();
-  _journeyFilterOpts.countries = [...new Set(_journeyVisits.map(v => v.country).filter(Boolean))].sort();
+  _journeyFilterOpts.cities    = [...new Set(_journeyVisits.map(v => (v.city    || '').trim()).filter(Boolean))].sort();
+  _journeyFilterOpts.countries = [...new Set(_journeyVisits.map(v => (v.country || '').trim()).filter(Boolean))].sort();
   _journeyFilterOpts.styles    = [...new Set(_journeyVisits.flatMap(v => v.styles || []))].sort();
   _journeyFilterOpts.years     = [...new Set(_journeyVisits.map(v => {
     const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
@@ -393,9 +420,9 @@ function renderJourney() {
     );
   }
 
-  // Filters
-  if (_journeyFilters.city)    visits = visits.filter(v => v.city    === _journeyFilters.city);
-  if (_journeyFilters.country) visits = visits.filter(v => v.country === _journeyFilters.country);
+  // Filters — trim both sides so whitespace differences don't break matching
+  if (_journeyFilters.city)    visits = visits.filter(v => (v.city    || '').trim() === _journeyFilters.city);
+  if (_journeyFilters.country) visits = visits.filter(v => (v.country || '').trim() === _journeyFilters.country);
   if (_journeyFilters.style)   visits = visits.filter(v => (v.styles || []).includes(_journeyFilters.style));
   if (_journeyFilters.year) {
     const yr = parseInt(_journeyFilters.year);
@@ -417,7 +444,8 @@ function renderJourney() {
     return;
   }
 
-  feed.innerHTML = visits.map(v => entryCard(v.id, v)).join('');
+  feed.innerHTML = visits.map(v => entryCard(v.id, v, 'open-entry')).join('');
+  initSwipeCards();
 }
 
 function renderJourneyFilterPills() {
@@ -691,9 +719,10 @@ async function openPlace(placeId) {
       ${visits.length ? `
         <div class="place-section-label" style="margin-top:${driftHtml ? '8px' : '0'};">Visit History</div>
         <div class="place-visit-history">
-          ${visits.map(v => entryCard(v.id, v)).join('')}
+          ${visits.map(v => entryCard(v.id, v, 'open-entry')).join('')}
         </div>` : ''}
     `;
+    initSwipeCards();
   } catch (e) {
     console.error('openPlace:', e);
     body.innerHTML = '<div style="text-align:center;padding:48px;opacity:.35;font-size:14px;">Couldn\'t load place.</div>';
@@ -1220,6 +1249,149 @@ function compressPhoto(file, targetKB = 150) {
     img.onerror = reject;
     img.src = url;
   });
+}
+
+// ── Swipe Gesture Handling ────────────────────────────────────
+let _openSwipeWrapper = null;
+
+function resetAllSwipes() {
+  if (_openSwipeWrapper) {
+    const card = _openSwipeWrapper.querySelector('.entry-card');
+    if (card) {
+      card.style.transition = 'transform 0.22s ease';
+      card.style.transform  = '';
+    }
+    _openSwipeWrapper = null;
+  }
+}
+
+function initSwipeCards() {
+  document.querySelectorAll('.swipe-wrapper:not([data-swipe-init])').forEach(wrapper => {
+    wrapper.setAttribute('data-swipe-init', '1');
+    const card = wrapper.querySelector('.entry-card');
+    if (!card) return;
+
+    let startX = 0, startY = 0, dx = 0;
+    let dragging = false, isScrolling = false;
+    const TRIGGER = 72; // px to trigger action
+
+    wrapper.addEventListener('touchstart', e => {
+      if (_openSwipeWrapper && _openSwipeWrapper !== wrapper) resetAllSwipes();
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dx = 0; dragging = true; isScrolling = false;
+      card.style.transition = 'none';
+    }, { passive: true });
+
+    wrapper.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const moveX = e.touches[0].clientX - startX;
+      const moveY = e.touches[0].clientY - startY;
+      // If primarily vertical — it's a scroll, don't interfere
+      if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 6) {
+        isScrolling = true;
+        card.style.transition = 'transform 0.22s ease';
+        card.style.transform  = '';
+        return;
+      }
+      if (isScrolling) return;
+      e.preventDefault(); // prevent page scroll during horizontal swipe
+      dx = moveX;
+      const clamped = Math.max(-(TRIGGER + 24), Math.min(TRIGGER, dx));
+      card.style.transform = `translateX(${clamped}px)`;
+    }, { passive: false });
+
+    wrapper.addEventListener('touchend', () => {
+      if (!dragging || isScrolling) { dragging = false; return; }
+      dragging = false;
+      card.style.transition = 'transform 0.22s ease';
+      const entryId = wrapper.dataset.entryId;
+
+      if (dx < -TRIGGER) {
+        // Left swipe → delete
+        card.style.transform = '';
+        _openSwipeWrapper = null;
+        deleteEntryById(entryId);
+      } else if (dx > TRIGGER) {
+        // Right swipe → edit
+        card.style.transform = '';
+        _openSwipeWrapper = null;
+        loadAndEditEntry(entryId);
+      } else {
+        // Partial swipe — snap back
+        card.style.transform = '';
+        _openSwipeWrapper = null;
+      }
+    });
+  });
+}
+
+// Reset any open swipe when user taps outside a card
+document.addEventListener('touchstart', e => {
+  if (_openSwipeWrapper && !_openSwipeWrapper.contains(e.target)) resetAllSwipes();
+}, { passive: true });
+
+async function loadAndEditEntry(id) {
+  if (!currentUser) return;
+  try {
+    const snap = await db.collection(`users/${currentUser.uid}/visits`).doc(id).get();
+    if (!snap.exists) { toast('Entry not found', 'error'); return; }
+    _detailVisitId   = id;
+    _detailVisitData = snap.data();
+    startEditEntry();
+  } catch(e) {
+    console.error('loadAndEditEntry:', e);
+    toast('Couldn\'t load entry — try again.', 'error');
+  }
+}
+
+async function deleteEntryById(id) {
+  if (!currentUser) return;
+  if (!confirm('Delete this entry? This can\'t be undone.')) return;
+  try {
+    await db.collection(`users/${currentUser.uid}/visits`).doc(id).delete();
+    toast('Entry deleted.', 'success');
+    document.getElementById('entry-detail-overlay')?.classList.add('hidden');
+    document.getElementById('place-detail-overlay')?.classList.add('hidden');
+    if (currentScreen === 'home')         loadHome();
+    else if (currentScreen === 'journey') loadJourney();
+    else if (currentScreen === 'places')  loadPlaces();
+  } catch(e) {
+    console.error('deleteEntryById:', e);
+    toast('Delete failed — try again.', 'error');
+  }
+}
+
+// ── Streak Settings ────────────────────────────────────────────
+function openStreakSettings() {
+  const overlay = document.getElementById('streak-settings-overlay');
+  if (!overlay) return;
+  const inp = document.getElementById('streak-start-input');
+  if (inp && _streakStartDate) inp.value = _streakStartDate;
+  overlay.classList.remove('hidden');
+}
+
+function closeStreakSettings() {
+  document.getElementById('streak-settings-overlay')?.classList.add('hidden');
+}
+
+async function saveStreakStart() {
+  if (!currentUser) return;
+  const inp = document.getElementById('streak-start-input');
+  if (!inp || !inp.value) { toast('Pick a start date', 'error'); return; }
+  const dateVal = inp.value;
+  try {
+    await db.collection(`users/${currentUser.uid}/settings`).doc('streakSettings').set({
+      startDate: dateVal,
+    });
+    _streakStartDate = dateVal;
+    closeStreakSettings();
+    loadHome();
+    toast('Streak start saved ✓', 'success');
+  } catch(e) {
+    console.error('saveStreakStart:', e);
+    toast('Couldn\'t save — try again.', 'error');
+  }
 }
 
 // ── Navigation wiring ─────────────────────────────────────────

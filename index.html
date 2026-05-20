@@ -276,14 +276,18 @@
         <div class="stat-label">Countries</div>
         <div class="stat-num" id="stat-countries">—</div>
       </div>
-      <!-- Streak — full width -->
-      <div class="stat-card streak">
+      <!-- Streak — full width, tappable to set start date -->
+      <div class="stat-card streak" onclick="openStreakSettings()" style="cursor:pointer;">
         <div class="streak-emoji">🔥</div>
         <div class="streak-body">
           <div class="streak-num" id="stat-streak">—</div>
           <div class="streak-title">Sunday Streak</div>
           <div class="streak-status" id="streak-status">Loading…</div>
         </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.28">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
       </div>
     </div>
 
@@ -613,6 +617,30 @@
         <div style="padding: 0 20px 8px;">
           <button class="btn-save" id="wishlist-save-btn" onclick="saveWishlistPlace()">Add to Bucket List</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── STREAK SETTINGS OVERLAY ──────────────────────── -->
+  <div id="streak-settings-overlay" class="detail-overlay hidden">
+    <div class="detail-sheet">
+      <div class="detail-topbar">
+        <button class="btn-icon" onclick="closeStreakSettings()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <div class="detail-action-btns">
+          <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#C8A97E;">Sunday Streak</span>
+        </div>
+      </div>
+      <div class="detail-scroll">
+        <p style="font-size:13px;color:rgba(240,234,214,0.45);line-height:1.65;margin-bottom:24px;">
+          Set the date your streak started. Sundays before this date won't be counted.
+        </p>
+        <label class="form-label" style="display:block;margin-bottom:8px;">Start Date</label>
+        <input type="date" id="streak-start-input" class="form-input" style="margin-bottom:24px;">
+        <button class="btn-save" onclick="saveStreakStart()">Save</button>
       </div>
     </div>
   </div>

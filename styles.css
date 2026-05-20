@@ -1112,3 +1112,39 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   gap: 9px;
 }
 
+/* ── SWIPE GESTURE CARDS ─────────────────────────────────────── */
+.swipe-wrapper {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.swipe-reveal {
+  position: absolute;
+  top: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 22px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.swipe-reveal-edit {
+  left: 0;
+  background: var(--amber);
+  color: var(--bg);
+}
+.swipe-reveal-delete {
+  right: 0;
+  background: var(--terracotta);
+  color: #fff;
+}
+.swipe-wrapper .entry-card {
+  position: relative;
+  z-index: 1;
+  border-radius: var(--r-lg);
+  will-change: transform;
+  background: var(--bg-card);
+}
