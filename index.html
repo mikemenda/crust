@@ -416,22 +416,67 @@
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Journey</span>
     </header>
-    <div class="screen-shell">
-      <div class="shell-icon">📋</div>
-      <p class="shell-text">Full chronological log.<br>Every pizza, in order.<br><em style="opacity:.6">Phase 2</em></p>
+
+    <!-- Search -->
+    <div class="journey-search-wrap">
+      <div class="search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="journey-search" placeholder="Search places, notes…" autocomplete="off" autocorrect="off">
+      </div>
     </div>
-  </div>
+
+    <!-- Filter pills -->
+    <div class="journey-filters" id="journey-filters"></div>
+
+    <!-- Count -->
+    <div class="journey-count" id="journey-count"></div>
+
+    <!-- Feed -->
+    <div class="journey-feed" id="journey-feed">
+      <div class="entry-card" style="pointer-events:none">
+        <div class="entry-thumb-placeholder skel" style="background:none;border-radius:8px;"></div>
+        <div class="entry-body">
+          <div class="skel" style="height:15px;width:65%;margin-bottom:6px;"></div>
+          <div class="skel" style="height:11px;width:42%;margin-bottom:8px;"></div>
+          <div class="skel" style="height:16px;width:52px;border-radius:20px;"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /journey -->
 
   <!-- ─── PLACES ────────────────────────────────────────── -->
   <div id="screen-places" class="screen">
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Places</span>
     </header>
-    <div class="screen-shell">
-      <div class="shell-icon">📍</div>
-      <p class="shell-text">Every spot you've visited.<br>Sorted, filtered, revisitable.<br><em style="opacity:.6">Phase 2</em></p>
+
+    <!-- Tabs -->
+    <div class="places-tabs">
+      <button class="places-tab active" data-tab="visited" onclick="switchPlacesTab('visited')">Visited</button>
+      <button class="places-tab" data-tab="wishlist" onclick="switchPlacesTab('wishlist')">Bucket List</button>
     </div>
-  </div>
+
+    <!-- Sort bar (visited only) -->
+    <div class="places-sort-bar" id="places-sort-bar">
+      <button class="sort-pill active" data-sort="recent" onclick="setPlacesSort('recent')">Recent</button>
+      <button class="sort-pill" data-sort="most-visited" onclick="setPlacesSort('most-visited')">Most Visited</button>
+      <button class="sort-pill" data-sort="highest-rated" onclick="setPlacesSort('highest-rated')">Top Rated</button>
+      <button class="sort-pill" data-sort="alpha" onclick="setPlacesSort('alpha')">A–Z</button>
+    </div>
+
+    <!-- Feed -->
+    <div class="places-feed" id="places-feed">
+      <div class="entry-card" style="pointer-events:none">
+        <div class="entry-thumb-placeholder skel" style="background:none;border-radius:8px;"></div>
+        <div class="entry-body">
+          <div class="skel" style="height:15px;width:65%;margin-bottom:6px;"></div>
+          <div class="skel" style="height:11px;width:42%;margin-bottom:8px;"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /places -->
 
   <!-- ─── PASSPORT ──────────────────────────────────────── -->
   <div id="screen-passport" class="screen">
@@ -440,7 +485,7 @@
     </header>
     <div class="screen-shell">
       <div class="shell-icon">🛂</div>
-      <p class="shell-text">Stats hub. Charts, rankings,<br>your pizza year in review.<br><em style="opacity:.6">Phase 2</em></p>
+      <p class="shell-text">Stats hub. Charts, rankings,<br>your pizza year in review.<br><em style="opacity:.6">Phase 3</em></p>
     </div>
   </div>
 
@@ -514,6 +559,60 @@
       </div>
       <div class="detail-scroll" id="detail-body">
         <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── FILTER PICKER SHEET ───────────────────────────── -->
+  <div id="filter-sheet-overlay" class="filter-sheet-overlay hidden" onclick="closeFilterSheet()">
+    <div class="filter-sheet" onclick="event.stopPropagation()">
+      <div class="filter-sheet-header">
+        <span class="filter-sheet-title" id="filter-sheet-title">Filter</span>
+        <button class="filter-sheet-clear" onclick="clearJourneyFilter()">Clear</button>
+      </div>
+      <div class="filter-options" id="filter-options-list"></div>
+    </div>
+  </div>
+
+  <!-- ─── PLACE DETAIL OVERLAY ──────────────────────────── -->
+  <div id="place-detail-overlay" class="place-detail-overlay hidden">
+    <div class="place-detail-sheet">
+      <div class="place-detail-topbar">
+        <button class="btn-icon" onclick="closePlaceDetail()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="place-detail-scroll" id="place-detail-body">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── WISHLIST ADD OVERLAY ──────────────────────────── -->
+  <div id="wishlist-add-overlay" class="detail-overlay hidden">
+    <div class="detail-sheet">
+      <div class="detail-topbar">
+        <button class="btn-icon" onclick="closeWishlistAdd()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <div class="detail-action-btns">
+          <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#C8A97E;">Bucket List</span>
+        </div>
+      </div>
+      <div class="detail-scroll">
+        <div class="form-block" style="margin-top:8px;">
+          <label class="form-label">Place</label>
+          <input type="text" id="wishlist-place-input" class="form-input"
+            placeholder="Search pizzeria…" autocomplete="off" autocorrect="off" spellcheck="false">
+          <div id="wishlist-autocomplete-list"></div>
+        </div>
+        <div style="padding: 0 20px 8px;">
+          <button class="btn-save" id="wishlist-save-btn" onclick="saveWishlistPlace()">Add to Bucket List</button>
+        </div>
       </div>
     </div>
   </div>

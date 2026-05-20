@@ -338,14 +338,503 @@ async function confirmDeleteEntry() {
   }
 }
 
-// ── Journey Screen (Phase 2 placeholder) ─────────────────────
-function loadJourney() {
-  // Full implementation in Phase 2
+// ── Journey Screen ────────────────────────────────────────────
+
+let _journeyVisits       = [];
+let _journeySearch       = '';
+let _journeyFilters      = { city: '', country: '', style: '', year: '' };
+let _journeyFilterOpts   = { cities: [], countries: [], styles: [], years: [] };
+let _journeyActiveFilter = null;
+let _filterOptionsList   = [];
+
+async function loadJourney() {
+  if (!currentUser) return;
+  const feed = document.getElementById('journey-feed');
+  if (feed) feed.innerHTML = skeletonCards(3);
+
+  try {
+    const snap = await db.collection(`users/${currentUser.uid}/visits`)
+      .orderBy('date', 'desc')
+      .get();
+    _journeyVisits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    buildJourneyFilterOpts();
+    renderJourney();
+  } catch (e) {
+    console.error('loadJourney:', e);
+    if (feed) feed.innerHTML = `<div class="empty-state"><div class="empty-body">Couldn't load entries.</div></div>`;
+  }
 }
 
-// ── Places Screen (Phase 2 placeholder) ──────────────────────
-function loadPlaces() {
-  // Full implementation in Phase 2
+function buildJourneyFilterOpts() {
+  _journeyFilterOpts.cities    = [...new Set(_journeyVisits.map(v => v.city).filter(Boolean))].sort();
+  _journeyFilterOpts.countries = [...new Set(_journeyVisits.map(v => v.country).filter(Boolean))].sort();
+  _journeyFilterOpts.styles    = [...new Set(_journeyVisits.flatMap(v => v.styles || []))].sort();
+  _journeyFilterOpts.years     = [...new Set(_journeyVisits.map(v => {
+    const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+    return isNaN(d) ? null : String(d.getFullYear());
+  }).filter(Boolean))].sort((a, b) => b - a);
+  renderJourneyFilterPills();
+}
+
+function renderJourney() {
+  const feed  = document.getElementById('journey-feed');
+  const count = document.getElementById('journey-count');
+  if (!feed) return;
+
+  let visits = _journeyVisits;
+
+  // Search
+  if (_journeySearch) {
+    const q = _journeySearch.toLowerCase();
+    visits = visits.filter(v =>
+      (v.placeName || '').toLowerCase().includes(q) ||
+      (v.notes     || '').toLowerCase().includes(q) ||
+      (v.city      || '').toLowerCase().includes(q)
+    );
+  }
+
+  // Filters
+  if (_journeyFilters.city)    visits = visits.filter(v => v.city    === _journeyFilters.city);
+  if (_journeyFilters.country) visits = visits.filter(v => v.country === _journeyFilters.country);
+  if (_journeyFilters.style)   visits = visits.filter(v => (v.styles || []).includes(_journeyFilters.style));
+  if (_journeyFilters.year) {
+    const yr = parseInt(_journeyFilters.year);
+    visits = visits.filter(v => {
+      const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+      return !isNaN(d) && d.getFullYear() === yr;
+    });
+  }
+
+  if (count) count.textContent = `${visits.length} ${visits.length === 1 ? 'pizza' : 'pizzas'}`;
+
+  if (!visits.length) {
+    feed.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">No results</div>
+        <div class="empty-body">Try adjusting your search or filters.</div>
+      </div>`;
+    return;
+  }
+
+  feed.innerHTML = visits.map(v => entryCard(v.id, v)).join('');
+}
+
+function renderJourneyFilterPills() {
+  const row = document.getElementById('journey-filters');
+  if (!row) return;
+  const pills = [];
+
+  const pill = (key, label) => {
+    const active = _journeyFilters[key];
+    pills.push(`<button class="filter-pill ${active ? 'active' : ''}"
+      onclick="openJourneyFilter('${key}')">${active ? esc(active) : label}</button>`);
+  };
+
+  if (_journeyFilterOpts.cities.length    > 1) pill('city',    'City');
+  if (_journeyFilterOpts.countries.length > 1) pill('country', 'Country');
+  if (_journeyFilterOpts.styles.length    > 0) pill('style',   'Style');
+  if (_journeyFilterOpts.years.length     > 1) pill('year',    'Year');
+
+  row.innerHTML = pills.join('');
+}
+
+function openJourneyFilter(key) {
+  _journeyActiveFilter = key;
+  const titles = { city: 'City', country: 'Country', style: 'Style', year: 'Year' };
+  _filterOptionsList = ({
+    city:    _journeyFilterOpts.cities,
+    country: _journeyFilterOpts.countries,
+    style:   _journeyFilterOpts.styles,
+    year:    _journeyFilterOpts.years,
+  })[key] || [];
+
+  const current = _journeyFilters[key];
+  document.getElementById('filter-sheet-title').textContent = titles[key] || key;
+
+  document.getElementById('filter-options-list').innerHTML = _filterOptionsList.map((o, i) => `
+    <div class="filter-option ${o === current ? 'selected' : ''}" onclick="selectJourneyFilter(${i})">
+      <span>${esc(o)}</span>
+      <div class="filter-option-check">
+        ${o === current
+          ? '<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#141414" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+          : ''}
+      </div>
+    </div>`).join('');
+
+  document.getElementById('filter-sheet-overlay').classList.remove('hidden');
+}
+
+function selectJourneyFilter(i) {
+  const value = _filterOptionsList[i];
+  if (value === undefined) return;
+  // Toggle: tap same value to clear
+  _journeyFilters[_journeyActiveFilter] = (_journeyFilters[_journeyActiveFilter] === value) ? '' : value;
+  closeFilterSheet();
+  renderJourneyFilterPills();
+  renderJourney();
+}
+
+function clearJourneyFilter() {
+  if (_journeyActiveFilter) {
+    _journeyFilters[_journeyActiveFilter] = '';
+    renderJourneyFilterPills();
+    renderJourney();
+  }
+  closeFilterSheet();
+}
+
+function closeFilterSheet() {
+  document.getElementById('filter-sheet-overlay').classList.add('hidden');
+  _journeyActiveFilter = null;
+}
+
+document.getElementById('journey-search')?.addEventListener('input', function() {
+  _journeySearch = this.value.trim();
+  renderJourney();
+});
+
+// ── Places Screen ─────────────────────────────────────────────
+
+let _placesAll  = [];
+let _placesSort = 'recent';
+let _placesTab  = 'visited';
+
+async function loadPlaces() {
+  if (!currentUser) return;
+  const feed = document.getElementById('places-feed');
+  if (feed) feed.innerHTML = skeletonCards(3);
+
+  try {
+    const snap = await db.collection(`users/${currentUser.uid}/places`).get();
+    _placesAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderPlaces();
+  } catch (e) {
+    console.error('loadPlaces:', e);
+    if (feed) feed.innerHTML = `<div class="empty-state"><div class="empty-body">Couldn't load places.</div></div>`;
+  }
+}
+
+function avgRating(ratingHistory) {
+  if (!ratingHistory?.length) return 0;
+  return ratingHistory.reduce((s, r) => s + (r.rating || 0), 0) / ratingHistory.length;
+}
+
+function renderPlaces() {
+  const feed    = document.getElementById('places-feed');
+  const sortBar = document.getElementById('places-sort-bar');
+  if (!feed) return;
+
+  if (sortBar) sortBar.style.display = _placesTab === 'visited' ? 'flex' : 'none';
+
+  let places = _placesAll.filter(p => _placesTab === 'wishlist' ? p.isWishlist : !p.isWishlist);
+
+  if (_placesTab === 'visited') {
+    places = [...places].sort((a, b) => {
+      if (_placesSort === 'most-visited')  return (b.visitCount || 0) - (a.visitCount || 0);
+      if (_placesSort === 'highest-rated') return avgRating(b.ratingHistory) - avgRating(a.ratingHistory);
+      if (_placesSort === 'alpha')         return (a.name || '').localeCompare(b.name || '');
+      // recent (default)
+      const da  = a.lastVisited?.toDate ? a.lastVisited.toDate() : new Date(a.lastVisited || 0);
+      const db2 = b.lastVisited?.toDate ? b.lastVisited.toDate() : new Date(b.lastVisited || 0);
+      return db2 - da;
+    });
+  }
+
+  let html = '';
+
+  if (_placesTab === 'wishlist') {
+    html += wishlistAddBtn();
+  }
+
+  if (!places.length) {
+    const msg = _placesTab === 'wishlist'
+      ? 'Search for spots you want to try.'
+      : 'Log a pizza to see places here.';
+    html += `
+      <div class="empty-state">
+        <div class="empty-icon">${_placesTab === 'wishlist' ? '⭐' : '📍'}</div>
+        <div class="empty-title">${_placesTab === 'wishlist' ? 'Bucket list is empty' : 'No places yet'}</div>
+        <div class="empty-body">${msg}</div>
+      </div>`;
+    feed.innerHTML = html;
+    return;
+  }
+
+  html += places.map(p => placeCard(p)).join('');
+  feed.innerHTML = html;
+}
+
+function wishlistAddBtn() {
+  return `<button class="btn-add-wishlist" onclick="openWishlistAdd()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Add a place
+  </button>`;
+}
+
+function placeCard(p) {
+  const pid     = p.placeId || p.id;
+  const avg     = avgRating(p.ratingHistory);
+  const loc     = [p.city, p.country].filter(Boolean).join(', ');
+  const lastD   = p.lastVisited?.toDate ? p.lastVisited.toDate()
+                : (p.lastVisited ? new Date(p.lastVisited) : null);
+  const lastStr = lastD && !isNaN(lastD)
+    ? lastD.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+
+  if (p.isWishlist) {
+    return `
+      <div class="place-card wishlist" onclick="openPlace('${pid}')">
+        <div class="place-card-top">
+          <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+          <span class="wishlist-badge">Want</span>
+        </div>
+        ${loc ? `<div class="place-card-sub">${esc(loc)}</div>` : ''}
+      </div>`;
+  }
+
+  return `
+    <div class="place-card" onclick="openPlace('${pid}')">
+      <div class="place-card-top">
+        <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+        ${avg ? `<div class="place-card-rating">${avg.toFixed(1)}<span>/ 10</span></div>` : ''}
+      </div>
+      ${loc ? `<div class="place-card-sub">${esc(loc)}</div>` : ''}
+      <div class="place-card-meta">
+        <span class="place-visit-badge">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+          ${p.visitCount || 1} ${(p.visitCount || 1) === 1 ? 'visit' : 'visits'}
+        </span>
+        ${lastStr ? `<span class="place-last-visit">Last: ${lastStr}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function switchPlacesTab(tab) {
+  _placesTab = tab;
+  document.querySelectorAll('.places-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === tab));
+  renderPlaces();
+}
+
+function setPlacesSort(sort) {
+  _placesSort = sort;
+  document.querySelectorAll('.sort-pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.sort === sort));
+  renderPlaces();
+}
+
+// ── Place Detail ──────────────────────────────────────────────
+
+async function openPlace(placeId) {
+  if (!currentUser) return;
+  const overlay = document.getElementById('place-detail-overlay');
+  const body    = document.getElementById('place-detail-body');
+  if (!overlay || !body) return;
+  overlay.classList.remove('hidden');
+  body.innerHTML = '<div style="text-align:center;padding:48px;opacity:.35;font-size:14px;">Loading…</div>';
+
+  try {
+    const placeSnap = await db.collection(`users/${currentUser.uid}/places`).doc(placeId).get();
+    if (!placeSnap.exists) { overlay.classList.add('hidden'); return; }
+    const place = placeSnap.data();
+
+    // Fetch visits and sort client-side to avoid requiring a Firestore composite index
+    const visitsSnap = await db.collection(`users/${currentUser.uid}/visits`)
+      .where('placeId', '==', placeId)
+      .get();
+    const visits = visitsSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const da  = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+        const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+        return db2 - da;
+      });
+
+    const loc = [place.city, place.country].filter(Boolean).join(', ');
+    const avg = avgRating(place.ratingHistory);
+    const vc  = place.visitCount || visits.length || 0;
+
+    // Rating drift — only show if 2+ rated visits
+    let driftHtml = '';
+    if ((place.ratingHistory || []).length > 1) {
+      const sorted = [...place.ratingHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+      driftHtml = `
+        <div class="place-section-label">Rating History</div>
+        <div class="rating-drift">
+          ${sorted.map(r => `
+            <div class="rating-drift-item">
+              <span class="rating-drift-date">${esc(r.date)}</span>
+              <span class="rating-drift-val">${r.rating}</span>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    body.innerHTML = `
+      <div class="place-detail-name">${esc(place.name || 'Unknown')}</div>
+      ${loc ? `<div class="place-detail-location">${esc(loc)}</div>` : ''}
+      <div class="place-stats-row">
+        <div class="place-stat-chip">
+          <div class="place-stat-chip-num">${vc}</div>
+          <div class="place-stat-chip-label">${vc === 1 ? 'Visit' : 'Visits'}</div>
+        </div>
+        ${avg ? `<div class="place-stat-chip">
+          <div class="place-stat-chip-num">${avg.toFixed(1)}</div>
+          <div class="place-stat-chip-label">Avg Rating</div>
+        </div>` : ''}
+      </div>
+      ${driftHtml}
+      ${visits.length ? `
+        <div class="place-section-label" style="margin-top:${driftHtml ? '8px' : '0'};">Visit History</div>
+        <div class="place-visit-history">
+          ${visits.map(v => entryCard(v.id, v)).join('')}
+        </div>` : ''}
+    `;
+  } catch (e) {
+    console.error('openPlace:', e);
+    body.innerHTML = '<div style="text-align:center;padding:48px;opacity:.35;font-size:14px;">Couldn\'t load place.</div>';
+  }
+}
+
+function closePlaceDetail() {
+  document.getElementById('place-detail-overlay').classList.add('hidden');
+}
+
+// ── Wishlist ──────────────────────────────────────────────────
+
+let _wishlistPlace       = null;
+let _wishlistSuggestions = [];
+
+function openWishlistAdd() {
+  _wishlistPlace       = null;
+  _wishlistSuggestions = [];
+  const inp  = document.getElementById('wishlist-place-input');
+  const list = document.getElementById('wishlist-autocomplete-list');
+  const btn  = document.getElementById('wishlist-save-btn');
+  if (inp)  inp.value = '';
+  if (list) list.innerHTML = '';
+  if (btn)  { btn.disabled = false; btn.textContent = 'Add to Bucket List'; }
+  document.getElementById('wishlist-add-overlay').classList.remove('hidden');
+}
+
+function closeWishlistAdd() {
+  document.getElementById('wishlist-add-overlay').classList.add('hidden');
+}
+
+document.getElementById('wishlist-place-input')?.addEventListener('input', async function() {
+  const q    = this.value.trim();
+  const list = document.getElementById('wishlist-autocomplete-list');
+  if (!list) return;
+  if (q.length < 2) { list.innerHTML = ''; return; }
+  if (typeof PLACES_API_KEY === 'undefined' || PLACES_API_KEY === 'YOUR_PLACES_API_KEY') return;
+
+  try {
+    const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': PLACES_API_KEY },
+      body: JSON.stringify({ input: q, sessionToken: crypto.randomUUID() }),
+    });
+    const data = await res.json();
+    _wishlistSuggestions = (data.suggestions || []).slice(0, 5);
+    list.innerHTML = _wishlistSuggestions.map((s, i) => {
+      const p    = s.placePrediction;
+      const main = p.structuredFormat?.mainText?.text || p.text?.text || '';
+      const sub  = p.structuredFormat?.secondaryText?.text || '';
+      return `<div class="autocomplete-item" onclick="selectWishlistPlace(${i})">
+        <div class="place-name">${esc(main)}</div>
+        <div class="place-sub">${esc(sub)}</div>
+      </div>`;
+    }).join('');
+  } catch (e) { console.warn('[Crust] Wishlist autocomplete:', e); }
+});
+
+async function selectWishlistPlace(i) {
+  const s = _wishlistSuggestions[i];
+  if (!s) return;
+  const p    = s.placePrediction;
+  const main = p.structuredFormat?.mainText?.text || p.text?.text || '';
+  const sub  = p.structuredFormat?.secondaryText?.text || '';
+
+  document.getElementById('wishlist-place-input').value = main;
+  document.getElementById('wishlist-autocomplete-list').innerHTML = '';
+  _wishlistPlace = { placeId: p.placeId, name: main, address: sub, city: '', country: '', lat: null, lng: null };
+
+  if (typeof PLACES_API_KEY !== 'undefined' && PLACES_API_KEY !== 'YOUR_PLACES_API_KEY') {
+    try {
+      const res = await fetch(
+        `https://places.googleapis.com/v1/places/${p.placeId}?fields=displayName,formattedAddress,location,addressComponents`,
+        { headers: { 'X-Goog-Api-Key': PLACES_API_KEY } }
+      );
+      const place = await res.json();
+      const comps = place.addressComponents || [];
+      const find  = type => (comps.find(c => c.types?.includes(type)) || {}).longText || '';
+      _wishlistPlace = {
+        placeId: p.placeId,
+        name:    place.displayName?.text || main,
+        address: place.formattedAddress  || sub,
+        city:    find('locality') || find('administrative_area_level_2'),
+        country: find('country'),
+        lat:     place.location?.latitude  ?? null,
+        lng:     place.location?.longitude ?? null,
+      };
+    } catch (e) { console.warn('[Crust] Wishlist place details:', e); }
+  }
+}
+
+async function saveWishlistPlace() {
+  if (!currentUser) return;
+  if (!_wishlistPlace) { toast('Search for a place first', 'error'); return; }
+
+  const btn = document.getElementById('wishlist-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    await db.collection(`users/${currentUser.uid}/places`).doc(_wishlistPlace.placeId).set({
+      placeId:    _wishlistPlace.placeId,
+      name:       _wishlistPlace.name,
+      address:    _wishlistPlace.address,
+      city:       _wishlistPlace.city,
+      country:    _wishlistPlace.country,
+      lat:        _wishlistPlace.lat,
+      lng:        _wishlistPlace.lng,
+      isWishlist: true,
+      visitCount: 0,
+      createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    // Update local cache
+    const existing = _placesAll.findIndex(p => (p.placeId || p.id) === _wishlistPlace.placeId);
+    const newEntry  = { ..._wishlistPlace, isWishlist: true, visitCount: 0 };
+    if (existing >= 0) _placesAll[existing] = newEntry;
+    else               _placesAll.push(newEntry);
+
+    toast('Added to bucket list! ⭐', 'success');
+    closeWishlistAdd();
+    renderPlaces();
+  } catch (e) {
+    console.error('saveWishlistPlace:', e);
+    toast('Save failed — try again.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Add to Bucket List'; }
+  }
+}
+
+// ── Skeleton helper ───────────────────────────────────────────
+function skeletonCards(n = 2) {
+  return Array(n).fill(`
+    <div class="entry-card" style="pointer-events:none">
+      <div class="entry-thumb-placeholder" style="border-radius:8px;">
+        <div class="skel" style="width:100%;height:100%;border-radius:8px;"></div>
+      </div>
+      <div class="entry-body">
+        <div class="skel" style="height:15px;width:65%;margin-bottom:6px;border-radius:6px;"></div>
+        <div class="skel" style="height:11px;width:42%;margin-bottom:8px;border-radius:6px;"></div>
+        <div class="skel" style="height:16px;width:52px;border-radius:20px;"></div>
+      </div>
+    </div>`).join('');
 }
 
 // ── LOG SCREEN ───────────────────────────────────────────────
