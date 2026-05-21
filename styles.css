@@ -1684,7 +1684,14 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
 }
 .feed-control-pills::-webkit-scrollbar { display: none; }
 
-/* ── CLICKABLE PLACE NAMES ───────────────────────────────────── */
+.stat-card--tap {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.stat-card--tap:active {
+  transform: scale(0.96);
+  opacity: 0.82;
+}
 .dest-spot-name--link {
   color: var(--amber);
   text-decoration: none;

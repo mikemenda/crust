@@ -128,8 +128,8 @@ async function loadStats(uid) {
     set('stat-spots',     spots);
     set('stat-cities',    cities);
     set('stat-countries', countries);
-    set('stat-streak',    streak);
-    set('streak-status',  streakLabel(streak));
+    set('stat-streak',   streak);
+    set('streak-status', streakLabel(streak, _streakStartDate));
   } catch (e) {
     console.error('loadStats:', e);
   }
@@ -140,8 +140,14 @@ function set(id, val) {
   if (el) el.textContent = val;
 }
 
-function streakLabel(n) {
-  if (n === 0) return 'Log a Sunday to start';
+function streakLabel(n, startDate = null) {
+  if (n === 0) return 'Tap to set your start date';
+  if (startDate) {
+    const d = new Date(startDate + 'T00:00:00');
+    if (!isNaN(d)) {
+      return `Since ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    }
+  }
   if (n === 1) return '1 Sunday strong 🍕';
   return `${n} Sundays straight`;
 }
@@ -151,33 +157,47 @@ function streakLabel(n) {
 // Backdating always allowed — streak recalculates from all stored data.
 // startDate (YYYY-MM-DD string) optionally ignores Sundays before that date.
 function calcSundayStreak(visits, startDate = null) {
-  const startMs = startDate ? new Date(startDate + 'T00:00:00').getTime() : 0;
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+
+  if (startDate) {
+    // ── DECLARED MODE ────────────────────────────────────────────
+    // User vouches for the streak starting on this date.
+    // Count ALL Sundays from startDate through today — no gap checking.
+    const start = new Date(startDate + 'T00:00:00');
+    if (isNaN(start)) return 0;
+
+    let count = 0;
+    const cur = new Date(start);
+    // Advance to first Sunday on or after start date
+    while (cur.getDay() !== 0) cur.setDate(cur.getDate() + 1);
+    // Count every Sunday up to and including today
+    while (cur <= todayDate) {
+      count++;
+      cur.setDate(cur.getDate() + 7);
+    }
+    return count;
+  }
+
+  // ── CONSECUTIVE MODE (no startDate set) ──────────────────────
   const sundaySet = new Set();
   visits.forEach(v => {
     const d = v.date?.toDate ? v.date.toDate() : (v.date ? new Date(v.date) : null);
     if (!d || isNaN(d)) return;
-    if (startDate && d.getTime() < startMs) return;
     if (d.getDay() === 0) sundaySet.add(ymd(d));
   });
   if (!sundaySet.size) return 0;
 
-  const today = new Date();
-  // Find the anchor Sunday (most recent Sunday including today if today is Sunday)
-  const offset = today.getDay(); // 0 = Sunday, 1 = Mon, ... 6 = Sat
-  const anchor = new Date(today);
-  anchor.setDate(today.getDate() - offset);
-  anchor.setHours(0, 0, 0, 0);
+  const offset = todayDate.getDay();
+  const anchor = new Date(todayDate);
+  anchor.setDate(todayDate.getDate() - offset);
 
-  // If today is Sunday but user hasn't logged yet, fall back to LAST Sunday
-  // so the streak doesn't wipe on a Sunday morning before logging
-  if (today.getDay() === 0 && !sundaySet.has(ymd(anchor))) {
+  // If today is Sunday and not yet logged, fall back to last Sunday
+  if (todayDate.getDay() === 0 && !sundaySet.has(ymd(anchor))) {
     anchor.setDate(anchor.getDate() - 7);
   }
-
-  // If the anchor Sunday still isn't in the set, streak is broken
   if (!sundaySet.has(ymd(anchor))) return 0;
 
-  // Walk backward counting consecutive logged Sundays
   let streak = 0;
   const cur = new Date(anchor);
   while (sundaySet.has(ymd(cur))) {
@@ -1618,53 +1638,63 @@ document.getElementById('photo-area').addEventListener('click', () =>
   document.getElementById('photo-input').click()
 );
 
-// ── Place/Dest detail: tap backdrop to close + swipe-down-from-topbar to close ──
+// ── Swipe-down to close ALL overlays ─────────────────────────
+// Works from anywhere on the sheet. When scroll content is below top, normal
+// scroll happens; swipe-dismiss only fires when sheet is scrolled to the top.
 (function() {
-  ['place-detail-overlay', 'dest-detail-overlay'].forEach(id => {
+  const overlayMap = {
+    'place-detail-overlay':  closePlaceDetail,
+    'dest-detail-overlay':   closeDestination,
+    'entry-detail-overlay':  closeEntryDetail,
+    'wishlist-add-overlay':  closeWishlistAdd,
+    'streak-settings-overlay': closeStreakSettings,
+  };
+
+  Object.entries(overlayMap).forEach(([id, closeFn]) => {
     const overlay = document.getElementById(id);
     if (!overlay) return;
 
-    // Tap on backdrop (dark area outside sheet) → close
-    overlay.addEventListener('click', function(e) {
-      if (e.target === overlay) {
-        if (id === 'place-detail-overlay') closePlaceDetail();
-        else closeDestination();
-      }
-    });
+    // Tap backdrop (dark area outside sheet) → close place/dest overlays only
+    if (id === 'place-detail-overlay' || id === 'dest-detail-overlay') {
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) closeFn();
+      });
+    }
 
-    // Swipe-down ONLY from the topbar (handle area) → dismiss
-    // Restricted to topbar so scrolling content works normally without moving background
-    const sheet  = overlay.querySelector('.place-detail-sheet');
-    const topbar = overlay.querySelector('.place-detail-topbar');
-    if (!sheet || !topbar) return;
+    const sheet      = overlay.querySelector('.place-detail-sheet, .detail-sheet');
+    const scrollArea = overlay.querySelector('.place-detail-scroll, .detail-scroll');
+    if (!sheet) return;
 
     let startY = 0, tracking = false;
 
-    topbar.addEventListener('touchstart', e => {
-      startY    = e.touches[0].clientY;
-      tracking  = true;
+    sheet.addEventListener('touchstart', e => {
+      startY   = e.touches[0].clientY;
+      tracking = true;
       sheet.style.transition = 'none';
     }, { passive: true });
 
-    topbar.addEventListener('touchmove', e => {
+    sheet.addEventListener('touchmove', e => {
       if (!tracking) return;
+      const scrollTop = scrollArea ? scrollArea.scrollTop : 0;
       const dy = e.touches[0].clientY - startY;
-      if (dy > 0) {
-        e.preventDefault(); // block page scroll while dragging sheet
-        sheet.style.transform = `translateY(${Math.min(dy, 220)}px)`;
+      if (dy > 0 && scrollTop <= 1) {
+        // Dragging down at top of content — animate dismiss
+        e.preventDefault();
+        sheet.style.transform = `translateY(${Math.min(dy, 240)}px)`;
+      } else {
+        // Scrolling content — let it scroll normally
+        tracking = false;
+        sheet.style.transform = '';
       }
-    }, { passive: false }); // must be false to allow preventDefault
+    }, { passive: false });
 
-    topbar.addEventListener('touchend', e => {
+    sheet.addEventListener('touchend', e => {
       if (!tracking) return;
       tracking = false;
       const dy = e.changedTouches[0].clientY - startY;
       sheet.style.transition = 'transform 0.22s ease';
       sheet.style.transform  = '';
-      if (dy > 80) {
-        if (id === 'place-detail-overlay') closePlaceDetail();
-        else closeDestination();
-      }
+      if (dy > 80) closeFn();
     });
   });
 })();
@@ -1887,47 +1917,40 @@ function renderPassportContent(visits, places, body) {
 }
 
 function buildPizzaChart(styleData, totalPies) {
-  const cx = 100, cy = 100, r = 80; // outer radius of each slice
+  const cx = 100, cy = 100, r = 82;
   const total    = styleData.reduce((s, d) => s + d.count, 0);
   const isSingle = styleData.length === 1;
-  const explode  = isSingle ? 0 : 5;  // px to push each slice outward from center
-  const gap      = isSingle ? 0 : 0.10; // radian gap between adjacent slices
+  const explode  = isSingle ? 0 : 8;
+  const gap      = isSingle ? 0 : 0.09;
 
-  let angle = -Math.PI / 2; // start at top
+  let angle = -Math.PI / 2;
 
   const segments = styleData.map(d => {
-    const frac    = d.count / total;
-    const sa      = angle + gap;
-    const ea      = angle + frac * 2 * Math.PI - gap;
-    const midA    = (sa + ea) / 2; // midpoint angle for explode direction
-    angle        += frac * 2 * Math.PI;
+    const frac = d.count / total;
+    const sa   = angle + gap;
+    const ea   = angle + frac * 2 * Math.PI - gap;
+    const midA = (sa + ea) / 2;
+    angle     += frac * 2 * Math.PI;
 
-    // Explode: translate each slice slightly outward
-    const tx = +(explode * Math.cos(midA)).toFixed(2);
-    const ty = +(explode * Math.sin(midA)).toFixed(2);
-
-    // Path: from origin (0,0), line to arc start, arc to arc end, close
-    // Applied via SVG transform so center = (cx, cy) coordinate space
+    const tx  = +(explode * Math.cos(midA)).toFixed(2);
+    const ty  = +(explode * Math.sin(midA)).toFixed(2);
     const o1x = +(r * Math.cos(sa)).toFixed(2);
     const o1y = +(r * Math.sin(sa)).toFixed(2);
     const o2x = +(r * Math.cos(ea)).toFixed(2);
     const o2y = +(r * Math.sin(ea)).toFixed(2);
     const la  = frac > 0.5 ? 1 : 0;
-
     const path = `M 0 0 L ${o1x} ${o1y} A ${r} ${r} 0 ${la} 1 ${o2x} ${o2y} Z`;
-    return {
-      label: d.label, count: d.count,
-      color: STYLE_COLORS[d.label] || '#6A6A7A',
-      path, frac, tx, ty,
-    };
+    return { label: d.label, count: d.count, color: STYLE_COLORS[d.label] || '#6A6A7A', path, frac, tx, ty };
   });
 
-  // Single style: full circle, no explode needed
   const slicesSvg = isSingle
-    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${segments[0].color}" />`
+    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${segments[0].color}"
+         stroke="var(--bg-card)" stroke-width="4" filter="url(#pdrop)"/>`
     : segments.map(s =>
         `<path d="${s.path}" fill="${s.color}"
-          transform="translate(${cx + s.tx}, ${cy + s.ty})" />`
+           stroke="var(--bg-card)" stroke-width="4" stroke-linejoin="round"
+           transform="translate(${cx + s.tx}, ${cy + s.ty})"
+           filter="url(#pdrop)" />`
       ).join('');
 
   const legend = segments.map(s => {
@@ -1941,16 +1964,14 @@ function buildPizzaChart(styleData, totalPies) {
 
   return `
     <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:4px 0 8px;">
-      <svg viewBox="0 0 200 200" width="200" height="200" overflow="visible">
+      <svg viewBox="0 0 200 200" width="210" height="210" overflow="visible">
+        <defs>
+          <filter id="pdrop" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgba(0,0,0,0.45)"/>
+          </filter>
+        </defs>
         ${slicesSvg}
-        ${isSingle ? '' : `
-          <!-- Center dot -->
-          <circle cx="${cx}" cy="${cy}" r="6" fill="var(--bg-card)" />
-        `}
-        <!-- Count text (always) -->
-        <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="var(--cream)"
-          font-family="Outfit,sans-serif" font-size="${isSingle ? 22 : 14}" font-weight="500"
-          opacity="${isSingle ? 0.85 : 0.65}">${totalPies}</text>
+        ${isSingle ? '' : `<circle cx="${cx}" cy="${cy}" r="5" fill="var(--bg-card)" />`}
       </svg>
       <div class="donut-legend" style="width:100%;padding:0 4px;">${legend}</div>
     </div>`;
@@ -2159,6 +2180,17 @@ async function loadDestinations() {
 function setDestView(view) {
   _destView = view;
   renderDestCards();
+}
+
+function navigateToDestinations(view) {
+  _destView  = view;
+  _placesTab = 'destinations';
+  navigate('places');
+  // Sync tab button states after nav
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.places-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.tab === 'destinations'));
+  });
 }
 
 function destViewToggle() {

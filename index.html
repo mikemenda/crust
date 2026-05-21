@@ -256,8 +256,10 @@
       <div class="header-right">
         <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
+            <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
+            <rect x="2" y="7" width="16" height="14" rx="2"/>
+            <circle cx="7" cy="13" r="1.5"/>
+            <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
           </svg>
         </button>
         <div id="avatar-wrap"><div class="avatar-initial">?</div></div>
@@ -266,19 +268,19 @@
 
     <!-- Stats -->
     <div class="stats-grid">
-      <div class="stat-card">
+      <div class="stat-card stat-card--tap" onclick="navigate('journey')">
         <div class="stat-label">Pizzas</div>
         <div class="stat-num" id="stat-pies">—</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card stat-card--tap" onclick="navigate('places')">
         <div class="stat-label">Spots</div>
         <div class="stat-num" id="stat-spots">—</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card stat-card--tap" onclick="navigateToDestinations('city')">
         <div class="stat-label">Cities</div>
         <div class="stat-num" id="stat-cities">—</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card stat-card--tap" onclick="navigateToDestinations('country')">
         <div class="stat-label">Countries</div>
         <div class="stat-num" id="stat-countries">—</div>
       </div>
@@ -406,8 +408,10 @@
         <div class="photo-area" id="photo-area">
           <div id="photo-area-inner" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
+              <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
+              <rect x="2" y="7" width="16" height="14" rx="2"/>
+              <circle cx="7" cy="13" r="1.5"/>
+              <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
             </svg>
             <span>Add photo</span>
           </div>
@@ -436,8 +440,10 @@
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Journey</span>
       <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-          <circle cx="12" cy="13" r="4"/>
+          <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
+          <rect x="2" y="7" width="16" height="14" rx="2"/>
+          <circle cx="7" cy="13" r="1.5"/>
+          <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
         </svg>
       </button>
     </header>
@@ -477,8 +483,10 @@
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Places</span>
       <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-          <circle cx="12" cy="13" r="4"/>
+          <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
+          <rect x="2" y="7" width="16" height="14" rx="2"/>
+          <circle cx="7" cy="13" r="1.5"/>
+          <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
         </svg>
       </button>
     </header>
@@ -547,8 +555,10 @@
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Passport</span>
       <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-          <circle cx="12" cy="13" r="4"/>
+          <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
+          <rect x="2" y="7" width="16" height="14" rx="2"/>
+          <circle cx="7" cy="13" r="1.5"/>
+          <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
         </svg>
       </button>
     </header>
@@ -701,7 +711,7 @@
       </div>
       <div class="detail-scroll">
         <p style="font-size:13px;color:rgba(240,234,214,0.45);line-height:1.65;margin-bottom:24px;">
-          Set the date your streak started. Sundays before this date won't be counted.
+          Set the date your pizza Sunday streak began. Every Sunday from that date to today counts — no gaps required. Starting today, log a pizza on Sundays to keep it going.
         </p>
         <label class="form-label" style="display:block;margin-bottom:8px;">Start Date</label>
         <input type="date" id="streak-start-input" class="form-input" style="margin-bottom:24px;">
