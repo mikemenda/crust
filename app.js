@@ -152,7 +152,6 @@ function streakLabel(n) {
 // startDate (YYYY-MM-DD string) optionally ignores Sundays before that date.
 function calcSundayStreak(visits, startDate = null) {
   const startMs = startDate ? new Date(startDate + 'T00:00:00').getTime() : 0;
-  // Build a set of "YYYY-MM-DD" keys for all visit dates that are Sundays
   const sundaySet = new Set();
   visits.forEach(v => {
     const d = v.date?.toDate ? v.date.toDate() : (v.date ? new Date(v.date) : null);
@@ -162,15 +161,21 @@ function calcSundayStreak(visits, startDate = null) {
   });
   if (!sundaySet.size) return 0;
 
-  // Most recent past Sunday (today if today is Sunday)
   const today = new Date();
-  const offset = today.getDay() === 0 ? 0 : today.getDay();
+  // Find the anchor Sunday (most recent Sunday including today if today is Sunday)
+  const offset = today.getDay(); // 0 = Sunday, 1 = Mon, ... 6 = Sat
   const anchor = new Date(today);
   anchor.setDate(today.getDate() - offset);
-  anchor.setHours(0,0,0,0);
+  anchor.setHours(0, 0, 0, 0);
 
-  // If the anchor Sunday was not logged and today isn't Sunday → streak broken
-  if (!sundaySet.has(ymd(anchor)) && today.getDay() !== 0) return 0;
+  // If today is Sunday but user hasn't logged yet, fall back to LAST Sunday
+  // so the streak doesn't wipe on a Sunday morning before logging
+  if (today.getDay() === 0 && !sundaySet.has(ymd(anchor))) {
+    anchor.setDate(anchor.getDate() - 7);
+  }
+
+  // If the anchor Sunday still isn't in the set, streak is broken
+  if (!sundaySet.has(ymd(anchor))) return 0;
 
   // Walk backward counting consecutive logged Sundays
   let streak = 0;
@@ -256,7 +261,7 @@ function entryCard(id, v, context = 'open-entry') {
   // Place logo: small circle before place name
   const logoUrl = v.placeId ? (_placeLogos[v.placeId] || null) : null;
   const logoHtml = logoUrl
-    ? `<img src="${esc(logoUrl)}" class="entry-place-logo" loading="lazy" />`
+    ? `<span class="entry-place-logo"><img src="${esc(logoUrl)}" loading="lazy" /></span>`
     : `<span class="entry-place-logo entry-place-logo--default">${pizzaLogoSvg(14)}</span>`;
 
   return `
@@ -753,7 +758,7 @@ function placeCard(p) {
     : '';
 
   const logoHtml = p.logoUrl
-    ? `<img src="${esc(p.logoUrl)}" class="place-card-logo" loading="lazy" />`
+    ? `<span class="place-card-logo"><img src="${esc(p.logoUrl)}" loading="lazy" /></span>`
     : `<span class="place-card-logo place-card-logo--default">${pizzaLogoSvg(18)}</span>`;
 
   if (p.isWishlist) {
@@ -859,12 +864,14 @@ async function openPlace(placeId) {
 
     body.innerHTML = `
       <div class="place-detail-header">
-        <div class="place-logo-wrap" onclick="changePlaceLogo('${esc(placeId)}')">
-          ${place.logoUrl
-            ? `<img src="${esc(place.logoUrl)}" class="place-logo-img" />`
-            : `<div class="place-logo-default">${pizzaLogoSvg(36)}</div>`}
+        <div class="place-logo-outer" onclick="changePlaceLogo('${esc(placeId)}')">
+          <div class="place-logo-inner">
+            ${place.logoUrl
+              ? `<img src="${esc(place.logoUrl)}" class="place-logo-img" />`
+              : `<div class="place-logo-default">${pizzaLogoSvg(36)}</div>`}
+          </div>
           <div class="place-logo-edit-hint">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </div>
         </div>
         <div class="place-detail-title-group">
@@ -1611,13 +1618,13 @@ document.getElementById('photo-area').addEventListener('click', () =>
   document.getElementById('photo-input').click()
 );
 
-// ── Place/Dest detail: tap backdrop to close + swipe down to close ──
+// ── Place/Dest detail: tap backdrop to close + swipe-down-from-topbar to close ──
 (function() {
   ['place-detail-overlay', 'dest-detail-overlay'].forEach(id => {
     const overlay = document.getElementById(id);
     if (!overlay) return;
 
-    // Tap on backdrop (outside sheet) → close
+    // Tap on backdrop (dark area outside sheet) → close
     overlay.addEventListener('click', function(e) {
       if (e.target === overlay) {
         if (id === 'place-detail-overlay') closePlaceDetail();
@@ -1625,29 +1632,36 @@ document.getElementById('photo-area').addEventListener('click', () =>
       }
     });
 
-    // Swipe down on sheet → close
-    const sheet = overlay.querySelector('.place-detail-sheet');
-    if (!sheet) return;
-    let touchStartY = 0, dragging = false;
-    sheet.addEventListener('touchstart', e => {
-      touchStartY = e.touches[0].clientY;
-      dragging = true;
+    // Swipe-down ONLY from the topbar (handle area) → dismiss
+    // Restricted to topbar so scrolling content works normally without moving background
+    const sheet  = overlay.querySelector('.place-detail-sheet');
+    const topbar = overlay.querySelector('.place-detail-topbar');
+    if (!sheet || !topbar) return;
+
+    let startY = 0, tracking = false;
+
+    topbar.addEventListener('touchstart', e => {
+      startY    = e.touches[0].clientY;
+      tracking  = true;
+      sheet.style.transition = 'none';
     }, { passive: true });
-    sheet.addEventListener('touchmove', e => {
-      if (!dragging) return;
-      const dy = e.touches[0].clientY - touchStartY;
+
+    topbar.addEventListener('touchmove', e => {
+      if (!tracking) return;
+      const dy = e.touches[0].clientY - startY;
       if (dy > 0) {
-        sheet.style.transform = `translateY(${Math.min(dy, 200)}px)`;
-        sheet.style.transition = 'none';
+        e.preventDefault(); // block page scroll while dragging sheet
+        sheet.style.transform = `translateY(${Math.min(dy, 220)}px)`;
       }
-    }, { passive: true });
-    sheet.addEventListener('touchend', e => {
-      if (!dragging) return;
-      dragging = false;
-      const dy = e.changedTouches[0].clientY - touchStartY;
+    }, { passive: false }); // must be false to allow preventDefault
+
+    topbar.addEventListener('touchend', e => {
+      if (!tracking) return;
+      tracking = false;
+      const dy = e.changedTouches[0].clientY - startY;
       sheet.style.transition = 'transform 0.22s ease';
       sheet.style.transform  = '';
-      if (dy > 90) {
+      if (dy > 80) {
         if (id === 'place-detail-overlay') closePlaceDetail();
         else closeDestination();
       }
@@ -1873,35 +1887,48 @@ function renderPassportContent(visits, places, body) {
 }
 
 function buildPizzaChart(styleData, totalPies) {
-  const cx = 100, cy = 100, outerR = 76, crustR = 88, crustW = 16;
-  const centerR = 20; // center circle for pie count
+  const cx = 100, cy = 100, r = 80; // outer radius of each slice
   const total    = styleData.reduce((s, d) => s + d.count, 0);
   const isSingle = styleData.length === 1;
+  const explode  = isSingle ? 0 : 5;  // px to push each slice outward from center
+  const gap      = isSingle ? 0 : 0.10; // radian gap between adjacent slices
 
-  let angle = -Math.PI / 2;
-  const gap = isSingle ? 0 : 0.07; // gap in radians between slices
+  let angle = -Math.PI / 2; // start at top
 
   const segments = styleData.map(d => {
-    const frac = d.count / total;
-    const sa   = angle + gap;
-    const ea   = angle + frac * 2 * Math.PI - gap;
-    angle     += frac * 2 * Math.PI;
-    const o1x = +(cx + outerR * Math.cos(sa)).toFixed(2);
-    const o1y = +(cy + outerR * Math.sin(sa)).toFixed(2);
-    const o2x = +(cx + outerR * Math.cos(ea)).toFixed(2);
-    const o2y = +(cy + outerR * Math.sin(ea)).toFixed(2);
+    const frac    = d.count / total;
+    const sa      = angle + gap;
+    const ea      = angle + frac * 2 * Math.PI - gap;
+    const midA    = (sa + ea) / 2; // midpoint angle for explode direction
+    angle        += frac * 2 * Math.PI;
+
+    // Explode: translate each slice slightly outward
+    const tx = +(explode * Math.cos(midA)).toFixed(2);
+    const ty = +(explode * Math.sin(midA)).toFixed(2);
+
+    // Path: from origin (0,0), line to arc start, arc to arc end, close
+    // Applied via SVG transform so center = (cx, cy) coordinate space
+    const o1x = +(r * Math.cos(sa)).toFixed(2);
+    const o1y = +(r * Math.sin(sa)).toFixed(2);
+    const o2x = +(r * Math.cos(ea)).toFixed(2);
+    const o2y = +(r * Math.sin(ea)).toFixed(2);
     const la  = frac > 0.5 ? 1 : 0;
-    // Full slice from center to arc (pizza-slice shape)
-    const path = isSingle
-      ? `M ${cx} ${cy} L ${+(cx + outerR * Math.cos(sa - gap + 0.001)).toFixed(2)} ${+(cy + outerR * Math.sin(sa - gap + 0.001)).toFixed(2)} A ${outerR} ${outerR} 0 1 1 ${+(cx + outerR * Math.cos(sa - gap + 0.001 - 0.002)).toFixed(2)} ${+(cy + outerR * Math.sin(sa - gap + 0.001 - 0.002)).toFixed(2)} Z`
-      : `M ${cx} ${cy} L ${o1x} ${o1y} A ${outerR} ${outerR} 0 ${la} 1 ${o2x} ${o2y} Z`;
-    return { label: d.label, count: d.count, color: STYLE_COLORS[d.label] || '#6A6A7A', path, frac };
+
+    const path = `M 0 0 L ${o1x} ${o1y} A ${r} ${r} 0 ${la} 1 ${o2x} ${o2y} Z`;
+    return {
+      label: d.label, count: d.count,
+      color: STYLE_COLORS[d.label] || '#6A6A7A',
+      path, frac, tx, ty,
+    };
   });
 
-  // For single-style: full circle
-  const singleFill = isSingle
-    ? `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${segments[0].color}" />`
-    : segments.map(s => `<path d="${s.path}" fill="${s.color}" />`).join('');
+  // Single style: full circle, no explode needed
+  const slicesSvg = isSingle
+    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${segments[0].color}" />`
+    : segments.map(s =>
+        `<path d="${s.path}" fill="${s.color}"
+          transform="translate(${cx + s.tx}, ${cy + s.ty})" />`
+      ).join('');
 
   const legend = segments.map(s => {
     const pct = Math.round(s.frac * 100);
@@ -1914,26 +1941,16 @@ function buildPizzaChart(styleData, totalPies) {
 
   return `
     <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:4px 0 8px;">
-      <svg viewBox="0 0 200 200" width="200" height="200">
-        <!-- Cream base: shows between slice gaps -->
-        <circle cx="${cx}" cy="${cy}" r="${crustR - 1}" fill="#E6DBC0" />
-        <!-- Pizza slices -->
-        ${singleFill}
-        <!-- Crust ring on top (cream texture ring) -->
-        <circle cx="${cx}" cy="${cy}" r="${crustR}" fill="none" stroke="#C8A97E" stroke-width="${crustW}" />
-        <!-- Crust inner shadow -->
-        <circle cx="${cx}" cy="${cy}" r="${crustR - Math.round(crustW/2)}" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="2" />
-        <!-- Topping dots (scattered across pizza body) -->
-        <circle cx="86" cy="80" r="3.5" fill="#D85A30" opacity="0.75"/>
-        <circle cx="110" cy="90" r="2.8" fill="#D85A30" opacity="0.65"/>
-        <circle cx="95" cy="115" r="3.0" fill="#D85A30" opacity="0.70"/>
-        <circle cx="78" cy="108" r="2.4" fill="#D85A30" opacity="0.60"/>
-        <circle cx="118" cy="112" r="2.4" fill="#D85A30" opacity="0.60"/>
-        <circle cx="105" cy="75" r="2.0" fill="#D85A30" opacity="0.55"/>
-        <!-- Center circle -->
-        <circle cx="${cx}" cy="${cy}" r="${centerR}" fill="#E6DBC0" />
-        <text x="${cx}" y="${cy + 6}" text-anchor="middle" fill="#3A2A14"
-          font-family="Outfit,sans-serif" font-size="16" font-weight="600">${totalPies}</text>
+      <svg viewBox="0 0 200 200" width="200" height="200" overflow="visible">
+        ${slicesSvg}
+        ${isSingle ? '' : `
+          <!-- Center dot -->
+          <circle cx="${cx}" cy="${cy}" r="6" fill="var(--bg-card)" />
+        `}
+        <!-- Count text (always) -->
+        <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="var(--cream)"
+          font-family="Outfit,sans-serif" font-size="${isSingle ? 22 : 14}" font-weight="500"
+          opacity="${isSingle ? 0.85 : 0.65}">${totalPies}</text>
       </svg>
       <div class="donut-legend" style="width:100%;padding:0 4px;">${legend}</div>
     </div>`;
