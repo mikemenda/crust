@@ -2050,7 +2050,7 @@ function buildPizzaChart(styleData, totalPies) {
 
   return `
     <div style="display:flex;flex-direction:column;align-items:center;gap:26px;padding:10px 0 8px;">
-      <svg viewBox="0 0 240 240" width="270" height="270" overflow="visible" class="pizza-chart-svg">
+      <svg viewBox="-30 -30 300 300" width="270" height="270" overflow="visible" class="pizza-chart-svg">
         <defs>
           <filter id="pizzaShadow" x="-40%" y="-40%" width="180%" height="180%">
             <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.38)"/>
