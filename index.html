@@ -253,8 +253,14 @@
       <div class="header-left">
         <span class="wordmark" style="font-size:18px; letter-spacing:3.5px;">CRUST</span>
       </div>
-      <div id="avatar-wrap">
-        <div class="avatar-initial">?</div>
+      <div class="header-right">
+        <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+        </button>
+        <div id="avatar-wrap"><div class="avatar-initial">?</div></div>
       </div>
     </header>
 
@@ -460,6 +466,7 @@
     <div class="places-tabs">
       <button class="places-tab active" data-tab="visited" onclick="switchPlacesTab('visited')">Visited</button>
       <button class="places-tab" data-tab="wishlist" onclick="switchPlacesTab('wishlist')">Bucket List</button>
+      <button class="places-tab" data-tab="destinations" onclick="switchPlacesTab('destinations')">Destinations</button>
     </div>
 
     <!-- Sort bar (visited only) -->
@@ -482,14 +489,33 @@
     </div>
   </div><!-- /places -->
 
+
+  <!-- ─── FEED ─────────────────────────────────────────── -->
+  <div id="screen-feed" class="screen">
+    <header class="app-header">
+      <div class="header-left" style="gap:8px;">
+        <button class="btn-icon" onclick="navigate('home')" aria-label="Back" style="color:var(--cream-40);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Feed</span>
+      </div>
+    </header>
+    <!-- Filter pills -->
+    <div class="journey-filters" id="feed-filters" style="padding-bottom:10px;"></div>
+    <!-- 3-col photo grid -->
+    <div class="feed-grid" id="feed-grid"></div>
+  </div>
+
   <!-- ─── PASSPORT ──────────────────────────────────────── -->
   <div id="screen-passport" class="screen">
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Passport</span>
     </header>
-    <div class="screen-shell">
-      <div class="shell-icon">🛂</div>
-      <p class="shell-text">Stats hub. Charts, rankings,<br>your pizza year in review.<br><em style="opacity:.6">Phase 3</em></p>
+    <div id="passport-body">
+      <!-- populated by loadPassport() -->
+      <div class="empty-state"><div class="empty-body" style="opacity:.35;">Loading…</div></div>
     </div>
   </div>
 
@@ -641,6 +667,53 @@
         <label class="form-label" style="display:block;margin-bottom:8px;">Start Date</label>
         <input type="date" id="streak-start-input" class="form-input" style="margin-bottom:24px;">
         <button class="btn-save" onclick="saveStreakStart()">Save</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─── FEED PHOTO OVERLAY ──────────────────────────── -->
+  <div id="feed-photo-overlay" class="feed-photo-overlay hidden">
+    <div class="feed-photo-topbar">
+      <button class="btn-icon" onclick="closeFeedPhoto()" aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <img id="feed-photo-img" src="" class="feed-photo-full" />
+    <div class="feed-photo-meta">
+      <div class="feed-photo-place" id="feed-photo-place"></div>
+      <div class="feed-photo-sub"   id="feed-photo-sub"></div>
+      <div class="feed-photo-rating" id="feed-photo-rating"></div>
+      <div class="feed-photo-notes"  id="feed-photo-notes" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ─── FEED FILTER SHEET ────────────────────────────── -->
+  <div id="feed-filter-sheet-overlay" class="filter-sheet-overlay hidden" onclick="closeFeedFilterSheet()">
+    <div class="filter-sheet" onclick="event.stopPropagation()">
+      <div class="filter-sheet-header">
+        <span class="filter-sheet-title" id="feed-filter-sheet-title">Filter</span>
+        <button class="filter-sheet-clear" onclick="clearFeedFilter()">Clear</button>
+      </div>
+      <div class="filter-options" id="feed-filter-options-list"></div>
+    </div>
+  </div>
+
+  <!-- ─── DESTINATION DETAIL OVERLAY ──────────────────── -->
+  <div id="dest-detail-overlay" class="place-detail-overlay hidden">
+    <div class="place-detail-sheet">
+      <div class="place-detail-topbar">
+        <button class="btn-icon" onclick="closeDestination()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <span id="dest-detail-title" style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--amber);"></span>
+      </div>
+      <div class="place-detail-scroll" id="dest-detail-body">
+        <!-- populated by openDestination() -->
       </div>
     </div>
   </div>
