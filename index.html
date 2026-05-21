@@ -297,6 +297,16 @@
       </div>
     </div>
 
+    <!-- Photo strip (hidden until photos exist) -->
+    <div id="home-photo-strip-section" style="display:none;">
+      <div class="section-header" style="padding-bottom:8px;">
+        <span class="section-label">Feed</span>
+        <button class="btn-see-all" onclick="navigate('feed')">See all</button>
+      </div>
+      <div id="home-photo-strip" class="home-photo-strip"></div>
+      <div style="height:16px;"></div>
+    </div>
+
     <!-- Recent entries -->
     <div class="section-header">
       <span class="section-label">Recent</span>
@@ -503,7 +513,12 @@
       </div>
     </header>
     <!-- Filter pills -->
-    <div class="journey-filters" id="feed-filters" style="padding-bottom:10px;"></div>
+    <div class="journey-filters" id="feed-filters" style="padding-bottom:4px;"></div>
+    <!-- Sort pills -->
+    <div class="journey-filters" id="feed-sort-row" style="padding-bottom:10px;">
+      <button class="filter-pill active" data-sort="date" onclick="setFeedSort('date')">Date</button>
+      <button class="filter-pill" data-sort="rating" onclick="setFeedSort('rating')">Rating</button>
+    </div>
     <!-- 3-col photo grid -->
     <div class="feed-grid" id="feed-grid"></div>
   </div>
@@ -680,6 +695,8 @@
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
       </button>
+      <div id="feed-photo-indicator" style="font-size:12px;color:rgba(240,234,214,.45);font-family:'Outfit',sans-serif;"></div>
+      <div style="width:32px;"></div>
     </div>
     <img id="feed-photo-img" src="" class="feed-photo-full" />
     <div class="feed-photo-meta">

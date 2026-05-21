@@ -15,6 +15,14 @@ let editingVisitId  = null;   // null = new entry, string id = editing
 let existingPhotoUrl = null;  // used when editing an entry that already has a photo
 let _streakStartDate = null;  // loaded from Firestore settings
 
+// Phase 3B state additions
+let _destGroups              = [];    // sorted destination groups — index used in onclick
+let _destCovers              = {};    // custom cover photos: coverKey → photoUrl
+let _pendingFeedOpenId       = null;  // set by home strip tap; openFeedPhoto() consumes it
+let _feedSort                = 'date'; // 'date' | 'rating'
+let _feedCurrentFilteredList = [];    // currently visible photos for swipe nav
+let _feedCurrentIdx          = 0;
+
 // ── Toast ────────────────────────────────────────────────────
 function toast(msg, type = '') {
   const el = document.getElementById('toast');
@@ -92,7 +100,7 @@ function profileMenu() {
 async function loadHome() {
   if (!currentUser) return;
   const uid = currentUser.uid;
-  await Promise.all([loadStats(uid), loadRecent(uid)]);
+  await Promise.all([loadStats(uid), loadRecent(uid), loadPhotoStrip(uid)]);
 }
 
 async function loadStats(uid) {
@@ -173,8 +181,37 @@ function ymd(d) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-async function loadRecent(uid) {
-  const container = document.getElementById('recent-entries');
+// ── Home Photo Strip ──────────────────────────────────────────
+async function loadPhotoStrip(uid) {
+  const section   = document.getElementById('home-photo-strip-section');
+  const container = document.getElementById('home-photo-strip');
+  if (!container || !section) return;
+  try {
+    const snap = await db.collection(`users/${uid}/visits`)
+      .orderBy('date', 'desc')
+      .limit(25)
+      .get();
+    const withPhotos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(v => v.photoUrl).slice(0, 8);
+    if (!withPhotos.length) { section.style.display = 'none'; return; }
+    section.style.display = '';
+    container.innerHTML = withPhotos.map(v =>
+      `<div class="strip-cell" onclick="openFeedFromPhoto('${v.id}')">
+        <img src="${esc(v.photoUrl)}" loading="lazy" />
+      </div>`
+    ).join('');
+  } catch(e) {
+    console.error('loadPhotoStrip:', e);
+    if (section) section.style.display = 'none';
+  }
+}
+
+function openFeedFromPhoto(id) {
+  _pendingFeedOpenId = id;
+  navigate('feed');
+}
+
+async function loadRecent(uid) {  const container = document.getElementById('recent-entries');
   try {
     const snap = await db.collection(`users/${uid}/visits`)
       .orderBy('date', 'desc')
@@ -1417,6 +1454,9 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Init swipe on feed photo overlay (once DOM is ready)
+window.addEventListener('load', () => { initFeedPhotoSwipe(); });
+
 // ── Helpers ───────────────────────────────────────────────────
 function esc(s) {
   if (!s) return '';
@@ -1504,7 +1544,6 @@ function renderPassportContent(visits, places, body) {
   const hof = places
     .filter(p => (p.visitCount || 0) > 0)
     .sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0))
-    .filter(p => (p.visitCount || 0) > 1)
     .slice(0, 10);
 
   // Pies by year
@@ -1558,7 +1597,7 @@ function renderPassportContent(visits, places, body) {
 
     ${styleData.length ? `
     <div class="pp-section-label">Style Breakdown</div>
-    <div class="pp-card">${buildDonutChart(styleData, pies)}</div>
+    <div class="pp-card">${buildPizzaChart(styleData, pies)}</div>
     ` : ''}
 
     ${ratedPlaces.length ? `
@@ -1626,55 +1665,61 @@ function renderPassportContent(visits, places, body) {
   `;
 }
 
-function buildDonutChart(styleData, totalPies) {
-  const r = 50, cx = 68, cy = 68, sw = 20;
-  const circ = 2 * Math.PI * r;
+function buildPizzaChart(styleData, totalPies) {
+  const cx = 80, cy = 80, r = 62;
   const total = styleData.reduce((s, d) => s + d.count, 0);
 
-  let cumFrac = 0;
+  // Build slices — handle single-style (100%) as a full circle
+  let angle = -Math.PI / 2;
   const slices = styleData.map(d => {
-    const frac = d.count / total;
-    const dashArray = `${frac * circ} ${circ}`;
-    const dashOffset = -(cumFrac * circ);
-    cumFrac += frac;
-    return {
-      label: d.label,
-      count: d.count,
-      color: STYLE_COLORS[d.label] || '#6A6A7A',
-      dashArray,
-      dashOffset,
-    };
+    const frac  = d.count / total;
+    const start = angle;
+    const end   = angle + frac * 2 * Math.PI;
+    angle = end;
+    const x1 = cx + r * Math.cos(start);
+    const y1 = cy + r * Math.sin(start);
+    const x2 = cx + r * Math.cos(end);
+    const y2 = cy + r * Math.sin(end);
+    const la  = frac > 0.5 ? 1 : 0;
+    // Single style = full circle (degenerate arc workaround)
+    const path = (total === d.count)
+      ? `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2*r} 0 a ${r} ${r} 0 1 0 -${2*r} 0`
+      : `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${la} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+    return { label: d.label, count: d.count, color: STYLE_COLORS[d.label] || '#6A6A7A', path, frac };
   });
 
-  const legend = slices.map(s =>
-    `<div class="donut-legend-item">
+  const legend = slices.map(s => {
+    const pct = Math.round(s.frac * 100);
+    return `<div class="donut-legend-item">
       <div class="donut-dot" style="background:${s.color}"></div>
       <span class="donut-lbl">${esc(s.label)}</span>
-      <span class="donut-cnt">${s.count}</span>
-    </div>`
-  ).join('');
+      <span class="donut-cnt">${pct}%</span>
+    </div>`;
+  }).join('');
 
   return `
-    <div class="donut-wrap">
-      <svg viewBox="0 0 136 136" width="136" height="136" style="flex-shrink:0">
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
-          stroke="rgba(240,234,214,0.07)" stroke-width="${sw}"/>
-        <g transform="rotate(-90 ${cx} ${cy})">
-          ${slices.map(s => `
-            <circle cx="${cx}" cy="${cy}" r="${r}"
-              fill="none" stroke="${s.color}"
-              stroke-width="${sw}"
-              stroke-dasharray="${s.dashArray}"
-              stroke-dashoffset="${s.dashOffset}"
-            />`).join('')}
-        </g>
-        <text x="${cx}" y="${cy - 5}" text-anchor="middle" fill="#F0EAD6"
-          font-family="Outfit,sans-serif" font-size="24" font-weight="200">${totalPies}</text>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:4px 0 8px;">
+      <svg viewBox="0 0 160 160" width="200" height="200">
+        <!-- Colored style slices -->
+        ${slices.map(s => `<path d="${s.path}" fill="${s.color}" />`).join('')}
+        <!-- Subtle slice dividers -->
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#141414" stroke-width="0.8" opacity="0.35"/>
+        <!-- Amber pizza crust ring -->
+        <circle cx="${cx}" cy="${cy}" r="68" fill="none" stroke="#C8A97E" stroke-width="9" />
+        <!-- Center medallion -->
+        <circle cx="${cx}" cy="${cy}" r="26" fill="rgba(20,20,20,0.82)" />
+        <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#F0EAD6"
+          font-family="Outfit,sans-serif" font-size="22" font-weight="200">${totalPies}</text>
         <text x="${cx}" y="${cy + 13}" text-anchor="middle" fill="rgba(240,234,214,0.4)"
-          font-family="Outfit,sans-serif" font-size="9" font-weight="600" letter-spacing="1.5">PIES</text>
+          font-family="Outfit,sans-serif" font-size="7.5" font-weight="600" letter-spacing="1.5">PIES</text>
       </svg>
-      <div class="donut-legend">${legend}</div>
+      <div class="donut-legend" style="width:100%;padding:0 4px;">${legend}</div>
     </div>`;
+}
+
+function buildDonutChart(styleData, totalPies) {
+  // Legacy — redirects to pizza chart
+  return buildPizzaChart(styleData, totalPies);
 }
 
 // ── PHOTO FEED ────────────────────────────────────────────────
@@ -1703,6 +1748,14 @@ async function loadFeed() {
 
     renderFeedFilterPills();
     renderFeedGrid();
+    // Sync sort pills to current state
+    document.querySelectorAll('#feed-sort-row .filter-pill').forEach(p =>
+      p.classList.toggle('active', p.dataset.sort === _feedSort));
+    // Open a specific photo if navigated here from the Home strip
+    if (_pendingFeedOpenId) {
+      openFeedPhoto(_pendingFeedOpenId);
+      _pendingFeedOpenId = null;
+    }
   } catch (e) {
     console.error('loadFeed:', e);
     if (grid) grid.innerHTML = '<div style="grid-column:1/-1;padding:48px;text-align:center;opacity:.35;font-size:14px;">Couldn\'t load photos.</div>';
@@ -1729,6 +1782,7 @@ function renderFeedGrid() {
   let visits = _feedVisits;
   if (_feedFilters.city)  visits = visits.filter(v => v.city === _feedFilters.city);
   if (_feedFilters.style) visits = visits.filter(v => (v.styles || []).includes(_feedFilters.style));
+  if (_feedSort === 'rating') visits = [...visits].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
 
   if (!visits.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
@@ -1787,30 +1841,83 @@ function closeFeedFilterSheet() {
 }
 
 function openFeedPhoto(id) {
-  const v = _feedVisits.find(x => x.id === id);
-  if (!v) return;
+  // Build the current filtered+sorted list for swipe nav
+  let visits = _feedVisits;
+  if (_feedFilters.city)  visits = visits.filter(v => v.city === _feedFilters.city);
+  if (_feedFilters.style) visits = visits.filter(v => (v.styles || []).includes(_feedFilters.style));
+  if (_feedSort === 'rating') visits = [...visits].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  _feedCurrentFilteredList = visits;
+  _feedCurrentIdx = visits.findIndex(x => x.id === id);
+  if (_feedCurrentIdx < 0) _feedCurrentIdx = 0;
+  renderFeedPhotoOverlay();
+}
 
+function renderFeedPhotoOverlay() {
+  const v = _feedCurrentFilteredList[_feedCurrentIdx];
+  if (!v) return;
   const d    = v.date?.toDate ? v.date.toDate() : new Date(v.date);
   const dStr = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const loc  = [v.city, v.country].filter(Boolean).join(', ');
-
   document.getElementById('feed-photo-img').src            = v.photoUrl;
   document.getElementById('feed-photo-place').textContent  = v.placeName || '';
   document.getElementById('feed-photo-sub').textContent    = [loc, dStr].filter(Boolean).join(' · ');
   document.getElementById('feed-photo-rating').textContent = v.rating != null ? `${v.rating} / 10` : '';
-
   const notesEl = document.getElementById('feed-photo-notes');
   if (notesEl) {
-    notesEl.textContent  = v.notes || '';
+    notesEl.textContent   = v.notes || '';
     notesEl.style.display = v.notes ? 'block' : 'none';
   }
-
+  const total = _feedCurrentFilteredList.length;
+  const indEl = document.getElementById('feed-photo-indicator');
+  if (indEl) indEl.textContent = total > 1 ? `${_feedCurrentIdx + 1} / ${total}` : '';
   document.getElementById('feed-photo-overlay').classList.remove('hidden');
+}
+
+function feedPhotoNext() {
+  if (_feedCurrentIdx < _feedCurrentFilteredList.length - 1) {
+    _feedCurrentIdx++;
+    renderFeedPhotoOverlay();
+  }
+}
+
+function feedPhotoPrev() {
+  if (_feedCurrentIdx > 0) {
+    _feedCurrentIdx--;
+    renderFeedPhotoOverlay();
+  }
 }
 
 function closeFeedPhoto() {
   document.getElementById('feed-photo-overlay').classList.add('hidden');
   document.getElementById('feed-photo-img').src = '';
+  _feedCurrentFilteredList = [];
+  _feedCurrentIdx = 0;
+}
+
+function setFeedSort(sort) {
+  _feedSort = sort;
+  document.querySelectorAll('#feed-sort-row .filter-pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.sort === sort));
+  renderFeedGrid();
+}
+
+function initFeedPhotoSwipe() {
+  const overlay = document.getElementById('feed-photo-overlay');
+  if (!overlay || overlay._swipeInit) return;
+  overlay._swipeInit = true;
+  let sx = 0, sy = 0;
+  overlay.addEventListener('touchstart', e => {
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+  }, { passive: true });
+  overlay.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    if (Math.abs(dx) > Math.abs(dy) + 10 && Math.abs(dx) > 48) {
+      if (dx < 0) feedPhotoNext();
+      else         feedPhotoPrev();
+    }
+  }, { passive: true });
 }
 
 // ── DESTINATIONS ──────────────────────────────────────────────
@@ -1819,13 +1926,22 @@ let _destVisits = null;
 let _destView   = 'city'; // 'city' | 'country'
 
 async function loadDestinations() {
-  const feed = document.getElementById('places-feed');
+  const feed    = document.getElementById('places-feed');
+  const sortBar = document.getElementById('places-sort-bar');
   if (!feed || !currentUser) return;
+  if (sortBar) sortBar.style.display = 'none';
   feed.innerHTML = destViewToggle() + skeletonCards(3);
 
   try {
-    const snap = await db.collection(`users/${currentUser.uid}/visits`).get();
-    _destVisits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const [visSnap, coverSnap] = await Promise.all([
+      db.collection(`users/${currentUser.uid}/visits`).get(),
+      db.collection(`users/${currentUser.uid}/destCovers`).get().catch(() => null),
+    ]);
+    _destVisits = visSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _destCovers = {};
+    if (coverSnap) {
+      coverSnap.docs.forEach(d => { _destCovers[d.id] = d.data().photoUrl || null; });
+    }
     renderDestCards();
   } catch (e) {
     console.error('loadDestinations:', e);
@@ -1860,9 +1976,14 @@ function renderDestCards() {
     if (!groups[k].photo && v.photoUrl) groups[k].photo = v.photoUrl;
   });
 
-  const sorted = Object.values(groups).sort((a, b) => b.visits.length - a.visits.length);
+  _destGroups = Object.values(groups).sort((a, b) => b.visits.length - a.visits.length);
+  // Overlay custom cover photos
+  _destGroups.forEach(g => {
+    const ck = `${_destView}__${g.name}`;
+    if (_destCovers[ck]) g.customPhoto = _destCovers[ck];
+  });
 
-  if (!sorted.length) {
+  if (!_destGroups.length) {
     feed.innerHTML = destViewToggle() + `<div class="empty-state">
       <div class="empty-icon">🌍</div>
       <div class="empty-title">No destinations yet</div>
@@ -1871,17 +1992,17 @@ function renderDestCards() {
     return;
   }
 
-  feed.innerHTML = destViewToggle() + `<div class="dest-feed">${sorted.map(g => destCard(g)).join('')}</div>`;
+  feed.innerHTML = destViewToggle() + `<div class="dest-feed">${_destGroups.map((g, i) => destCard(g, i)).join('')}</div>`;
 }
 
-function destCard(g) {
+function destCard(g, i) {
   const spots = g.places.size;
-  const nameJson = JSON.stringify(g.name);
+  const photo = g.customPhoto || g.photo;
   return `
-    <div class="dest-card" onclick="openDestination(${nameJson})">
+    <div class="dest-card" onclick="openDestination(${i})">
       <div class="dest-card-photo-wrap">
-        ${g.photo
-          ? `<img src="${esc(g.photo)}" class="dest-card-photo" loading="lazy" />`
+        ${photo
+          ? `<img src="${esc(photo)}" class="dest-card-photo" loading="lazy" />`
           : `<div class="dest-card-photo dest-card-photo-empty">🍕</div>`}
       </div>
       <div class="dest-card-body">
@@ -1894,7 +2015,10 @@ function destCard(g) {
     </div>`;
 }
 
-async function openDestination(name) {
+async function openDestination(idx) {
+  const g = _destGroups[idx];
+  if (!g) return;
+  const name    = g.name;
   const overlay = document.getElementById('dest-detail-overlay');
   const body    = document.getElementById('dest-detail-body');
   const titleEl = document.getElementById('dest-detail-title');
@@ -1923,10 +2047,19 @@ async function openDestination(name) {
     return avgB - avgA;
   })[0];
 
-  const coverPhoto = mine.find(v => v.photoUrl)?.photoUrl;
+  const coverKey   = `${_destView}__${name}`;
+  const coverPhoto = _destCovers[coverKey] || mine.find(v => v.photoUrl)?.photoUrl;
 
   body.innerHTML = `
-    ${coverPhoto ? `<img src="${esc(coverPhoto)}" style="width:100%;border-radius:14px;margin-bottom:16px;max-height:200px;object-fit:cover;" />` : ''}
+    <div class="dest-cover-wrap">
+      ${coverPhoto
+        ? `<img src="${esc(coverPhoto)}" class="dest-cover-img" />`
+        : `<div class="dest-cover-placeholder">🍕</div>`}
+      <button class="dest-cover-change-btn" onclick="changeDestCover('${esc(coverKey)}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Change photo
+      </button>
+    </div>
     <div class="place-stats-row" style="margin-bottom:20px;">
       <div class="place-stat-chip">
         <div class="place-stat-chip-num">${mine.length}</div>
@@ -1957,6 +2090,42 @@ async function openDestination(name) {
       </div>`;
     }).join('')}
   `;
+}
+
+async function changeDestCover(coverKey) {
+  if (!currentUser) return;
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = async function() {
+    const file = this.files[0];
+    if (!file) return;
+    try {
+      const compressed = await compressPhoto(file);
+      const ref = storage.ref(`users/${currentUser.uid}/destCovers/${Date.now()}.jpg`);
+      await ref.put(compressed, { contentType: 'image/jpeg' });
+      const url = await ref.getDownloadURL();
+      await db.collection(`users/${currentUser.uid}/destCovers`).doc(coverKey).set({
+        photoUrl: url,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      _destCovers[coverKey] = url;
+      // Update visible cover in the open detail sheet
+      const img = document.querySelector('.dest-cover-img');
+      if (img) { img.src = url; }
+      else {
+        const ph = document.querySelector('.dest-cover-placeholder');
+        if (ph) ph.outerHTML = `<img src="${esc(url)}" class="dest-cover-img" />`;
+      }
+      // Update cache so card updates on next render
+      const g = _destGroups.find(g => `${_destView}__${g.name}` === coverKey);
+      if (g) g.customPhoto = url;
+      toast('Cover photo updated ✓', 'success');
+    } catch(e) {
+      console.error('changeDestCover:', e);
+      toast('Photo update failed — try again.', 'error');
+    }
+  };
+  input.click();
 }
 
 function closeDestination() {
