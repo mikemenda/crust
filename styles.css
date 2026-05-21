@@ -1821,3 +1821,41 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
 .place-detail-title-group { flex: 1; min-width: 0; }
 .place-detail-title-group .place-detail-name { margin-bottom: 4px; }
 .place-detail-title-group .place-detail-location { margin-bottom: 0; }
+
+/* ── PIZZA CHART — Animated slices ──────────────────────────── */
+.pizza-slice-group {
+  opacity: 0;
+  transform-origin: center;
+  animation: pizzaSliceIn 550ms cubic-bezier(.2,.9,.2,1) forwards;
+  animation-delay: var(--delay, 0ms);
+  transition:
+    transform 220ms ease,
+    filter 220ms ease;
+}
+.pizza-slice-group:hover {
+  transform:
+    translate(var(--tx, 0), var(--ty, 0))
+    scale(1.04);
+}
+.pizza-slice-main {
+  transition:
+    filter 220ms ease,
+    transform 220ms ease;
+}
+.pizza-chart-svg:hover .pizza-slice-main {
+  filter: brightness(1.03);
+}
+@keyframes pizzaSliceIn {
+  0% {
+    opacity: 0;
+    transform: scale(.6) rotate(-10deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.04) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
