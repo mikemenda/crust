@@ -22,6 +22,7 @@ let _pendingFeedOpenId       = null;  // set by home strip tap; openFeedPhoto() 
 let _feedSort                = 'date'; // 'date' | 'rating'
 let _feedCurrentFilteredList = [];    // currently visible photos for swipe nav
 let _feedCurrentIdx          = 0;
+let _placeLogos              = {};    // placeId → logoUrl (cached for entry cards)
 
 // ── Toast ────────────────────────────────────────────────────
 function toast(msg, type = '') {
@@ -100,6 +101,10 @@ function profileMenu() {
 async function loadHome() {
   if (!currentUser) return;
   const uid = currentUser.uid;
+  // Load logos in background so entry cards can show them
+  db.collection(`users/${uid}/places`).get().then(snap => {
+    snap.docs.forEach(d => { const p = d.data(); if (p.logoUrl) _placeLogos[p.placeId || d.id] = p.logoUrl; });
+  }).catch(() => {});
   await Promise.all([loadStats(uid), loadRecent(uid), loadPhotoGrid(uid)]);
 }
 
@@ -192,7 +197,7 @@ async function loadPhotoGrid(uid) {
       .limit(30)
       .get();
     const withPhotos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(v => v.photoUrl).slice(0, 6);
+      .filter(v => v.photoUrl).slice(0, 3);
     if (!withPhotos.length) { section.style.display = 'none'; return; }
     section.style.display = '';
     grid.innerHTML = withPhotos.map(v =>
@@ -248,6 +253,12 @@ function entryCard(id, v, context = 'open-entry') {
     ? `openPlace('${esc(v.placeId)}')`
     : `openEntry('${id}')`;
 
+  // Place logo: small circle before place name
+  const logoUrl = v.placeId ? (_placeLogos[v.placeId] || null) : null;
+  const logoHtml = logoUrl
+    ? `<img src="${esc(logoUrl)}" class="entry-place-logo" loading="lazy" />`
+    : `<span class="entry-place-logo entry-place-logo--default">${pizzaLogoSvg(14)}</span>`;
+
   return `
     <div class="swipe-wrapper" data-entry-id="${id}">
       <div class="swipe-reveal swipe-reveal-edit">
@@ -261,7 +272,10 @@ function entryCard(id, v, context = 'open-entry') {
       <div class="entry-card" onclick="${tapFn}">
         ${thumb}
         <div class="entry-body">
-          <div class="entry-place">${esc(v.placeName || 'Unknown')}</div>
+          <div class="entry-place-row">
+            ${logoHtml}
+            <div class="entry-place">${esc(v.placeName || 'Unknown')}</div>
+          </div>
           <div class="entry-sub">${esc(v.city || '')}${v.city && dStr ? ' · ' : ''}${dStr}</div>
           <div class="entry-tags">${tags}</div>
         </div>
@@ -419,10 +433,13 @@ async function loadJourney() {
   if (feed) feed.innerHTML = skeletonCards(3);
 
   try {
-    const snap = await db.collection(`users/${currentUser.uid}/visits`)
-      .orderBy('date', 'desc')
-      .get();
-    _journeyVisits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const [visSnap, plSnap] = await Promise.all([
+      db.collection(`users/${currentUser.uid}/visits`).orderBy('date', 'desc').get(),
+      db.collection(`users/${currentUser.uid}/places`).get(),
+    ]);
+    _journeyVisits = visSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Populate logo cache
+    plSnap.docs.forEach(d => { const p = d.data(); if (p.logoUrl) _placeLogos[p.placeId || d.id] = p.logoUrl; });
     buildJourneyFilterOpts();
     renderJourney();
   } catch (e) {
@@ -567,6 +584,10 @@ let _placesAll  = [];
 let _placesSort = 'recent';
 let _placesTab  = 'visited';
 
+// Wishlist filter state
+let _wishlistFilters    = { city: '', country: '' };
+let _wishlistFilterOpts = { cities: [], countries: [] };
+
 async function loadPlaces() {
   if (!currentUser) return;
   const feed = document.getElementById('places-feed');
@@ -575,11 +596,27 @@ async function loadPlaces() {
   try {
     const snap = await db.collection(`users/${currentUser.uid}/places`).get();
     _placesAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Populate logo cache for use in entry cards throughout the app
+    _placeLogos = {};
+    _placesAll.forEach(p => { if (p.logoUrl) _placeLogos[p.placeId || p.id] = p.logoUrl; });
     if (_placesTab === 'destinations') { loadDestinations(); } else { renderPlaces(); }
   } catch (e) {
     console.error('loadPlaces:', e);
     if (feed) feed.innerHTML = `<div class="empty-state"><div class="empty-body">Couldn't load places.</div></div>`;
   }
+}
+
+// Small pizza SVG for use as default place logo
+function pizzaLogoSvg(size = 20) {
+  const scale = size / 20;
+  return `<svg viewBox="0 0 20 20" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+    <path d="M 8 10 L 12.6 6.8 A 5.6 5.6 0 1 0 12.6 13.2 Z" fill="#F0EAD6"/>
+    <path d="M 12.6 6.8 A 5.6 5.6 0 1 0 12.6 13.2" stroke="#C8A97E" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+    <circle cx="5.2" cy="8.4"  r="0.7" fill="#D85A30"/>
+    <circle cx="4.4" cy="11"   r="0.6" fill="#D85A30"/>
+    <circle cx="8"   cy="7"    r="0.6" fill="#D85A30"/>
+    <circle cx="7.4" cy="12.6" r="0.5" fill="#D85A30"/>
+  </svg>`;
 }
 
 function avgRating(ratingHistory) {
@@ -595,6 +632,15 @@ function renderPlaces() {
   if (sortBar) sortBar.style.display = _placesTab === 'visited' ? 'flex' : 'none';
 
   let places = _placesAll.filter(p => _placesTab === 'wishlist' ? p.isWishlist : !p.isWishlist);
+
+  if (_placesTab === 'wishlist') {
+    // Build filter opts from wishlist places
+    _wishlistFilterOpts.cities    = [...new Set(places.map(p => p.city).filter(Boolean))].sort();
+    _wishlistFilterOpts.countries = [...new Set(places.map(p => p.country).filter(Boolean))].sort();
+    // Apply filters
+    if (_wishlistFilters.city)    places = places.filter(p => p.city === _wishlistFilters.city);
+    if (_wishlistFilters.country) places = places.filter(p => p.country === _wishlistFilters.country);
+  }
 
   if (_placesTab === 'visited') {
     places = [...places].sort((a, b) => {
@@ -612,6 +658,10 @@ function renderPlaces() {
 
   if (_placesTab === 'wishlist') {
     html += wishlistAddBtn();
+    // Render filter pills if we have options
+    if (_wishlistFilterOpts.cities.length > 1 || _wishlistFilterOpts.countries.length > 0) {
+      html += renderWishlistFilterPills();
+    }
   }
 
   if (!places.length) {
@@ -641,6 +691,57 @@ function wishlistAddBtn() {
   </button>`;
 }
 
+function renderWishlistFilterPills() {
+  const pills = [];
+  if (_wishlistFilterOpts.cities.length > 1) {
+    const active = _wishlistFilters.city;
+    pills.push(`<button class="filter-pill ${active ? 'active' : ''}" onclick="openWishlistFilter('city')">${active ? esc(active) : 'City'}</button>`);
+  }
+  if (_wishlistFilterOpts.countries.length > 1) {
+    const active = _wishlistFilters.country;
+    pills.push(`<button class="filter-pill ${active ? 'active' : ''}" onclick="openWishlistFilter('country')">${active ? esc(active) : 'Country'}</button>`);
+  }
+  if (!pills.length) return '';
+  return `<div class="journey-filters" style="padding-bottom:8px;">${pills.join('')}</div>`;
+}
+
+let _wishlistActiveFilter   = null;
+let _wishlistFilterOptsList = [];
+
+function openWishlistFilter(key) {
+  _wishlistActiveFilter   = key;
+  _wishlistFilterOptsList = key === 'city' ? _wishlistFilterOpts.cities : _wishlistFilterOpts.countries;
+  const current = _wishlistFilters[key];
+  document.getElementById('filter-sheet-title').textContent = key === 'city' ? 'City' : 'Country';
+  document.getElementById('filter-options-list').innerHTML = _wishlistFilterOptsList.map((o, i) => `
+    <div class="filter-option ${o === current ? 'selected' : ''}" onclick="selectWishlistFilter(${i})">
+      <span>${esc(o)}</span>
+      <div class="filter-option-check">
+        ${o === current ? '<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#141414" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ''}
+      </div>
+    </div>`).join('');
+  // Reuse journey filter sheet but wire clear/select to wishlist handlers
+  const clearBtn = document.querySelector('#filter-sheet-overlay .filter-sheet-clear');
+  if (clearBtn) clearBtn.setAttribute('onclick', 'clearWishlistFilter()');
+  document.getElementById('filter-sheet-overlay').classList.remove('hidden');
+}
+
+function selectWishlistFilter(i) {
+  const value = _wishlistFilterOptsList[i];
+  if (value === undefined) return;
+  _wishlistFilters[_wishlistActiveFilter] = (_wishlistFilters[_wishlistActiveFilter] === value) ? '' : value;
+  closeFilterSheet();
+  renderPlaces();
+}
+
+function clearWishlistFilter() {
+  if (_wishlistActiveFilter) {
+    _wishlistFilters[_wishlistActiveFilter] = '';
+    renderPlaces();
+  }
+  closeFilterSheet();
+}
+
 function placeCard(p) {
   const pid     = p.placeId || p.id;
   const avg     = avgRating(p.ratingHistory);
@@ -651,11 +752,18 @@ function placeCard(p) {
     ? lastD.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
 
+  const logoHtml = p.logoUrl
+    ? `<img src="${esc(p.logoUrl)}" class="place-card-logo" loading="lazy" />`
+    : `<span class="place-card-logo place-card-logo--default">${pizzaLogoSvg(18)}</span>`;
+
   if (p.isWishlist) {
     return `
       <div class="place-card wishlist" onclick="openPlace('${pid}')">
         <div class="place-card-top">
-          <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+          <div class="place-card-name-row">
+            ${logoHtml}
+            <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+          </div>
           <span class="wishlist-badge">Want</span>
         </div>
         ${loc ? `<div class="place-card-sub">${esc(loc)}</div>` : ''}
@@ -665,7 +773,10 @@ function placeCard(p) {
   return `
     <div class="place-card" onclick="openPlace('${pid}')">
       <div class="place-card-top">
-        <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+        <div class="place-card-name-row">
+          ${logoHtml}
+          <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+        </div>
         ${avg ? `<div class="place-card-rating">${avg.toFixed(1)}<span>/ 10</span></div>` : ''}
       </div>
       ${loc ? `<div class="place-card-sub">${esc(loc)}</div>` : ''}
@@ -683,6 +794,8 @@ function placeCard(p) {
 
 function switchPlacesTab(tab) {
   _placesTab = tab;
+  // Reset wishlist filters on tab switch
+  if (tab !== 'wishlist') _wishlistFilters = { city: '', country: '' };
   document.querySelectorAll('.places-tab').forEach(t =>
     t.classList.toggle('active', t.dataset.tab === tab));
   if (tab === 'destinations') loadDestinations();
@@ -703,6 +816,8 @@ async function openPlace(placeId) {
   const overlay = document.getElementById('place-detail-overlay');
   const body    = document.getElementById('place-detail-body');
   if (!overlay || !body) return;
+  // Ensure place detail always renders above dest detail (both are z-index 600 by class)
+  overlay.style.zIndex = '620';
   overlay.classList.remove('hidden');
   body.innerHTML = '<div style="text-align:center;padding:48px;opacity:.35;font-size:14px;">Loading…</div>';
 
@@ -743,8 +858,20 @@ async function openPlace(placeId) {
     }
 
     body.innerHTML = `
-      <div class="place-detail-name">${esc(place.name || 'Unknown')}</div>
-      ${loc ? `<div class="place-detail-location">${esc(loc)}</div>` : ''}
+      <div class="place-detail-header">
+        <div class="place-logo-wrap" onclick="changePlaceLogo('${esc(placeId)}')">
+          ${place.logoUrl
+            ? `<img src="${esc(place.logoUrl)}" class="place-logo-img" />`
+            : `<div class="place-logo-default">${pizzaLogoSvg(36)}</div>`}
+          <div class="place-logo-edit-hint">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </div>
+        </div>
+        <div class="place-detail-title-group">
+          <div class="place-detail-name">${esc(place.name || 'Unknown')}</div>
+          ${loc ? `<div class="place-detail-location">${esc(loc)}</div>` : ''}
+        </div>
+      </div>
       <div class="place-stats-row">
         <div class="place-stat-chip">
           <div class="place-stat-chip-num">${vc}</div>
@@ -770,7 +897,45 @@ async function openPlace(placeId) {
 }
 
 function closePlaceDetail() {
-  document.getElementById('place-detail-overlay').classList.add('hidden');
+  const overlay = document.getElementById('place-detail-overlay');
+  overlay.classList.add('hidden');
+  overlay.style.zIndex = ''; // reset so it doesn't stay elevated
+}
+
+async function changePlaceLogo(placeId) {
+  if (!currentUser) return;
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = async function() {
+    const file = this.files[0];
+    if (!file) return;
+    try {
+      const compressed = await compressPhoto(file, 80); // smaller target for logos
+      const ref = storage.ref(`users/${currentUser.uid}/placeLogos/${placeId}.jpg`);
+      await ref.put(compressed, { contentType: 'image/jpeg' });
+      const url = await ref.getDownloadURL();
+      await db.collection(`users/${currentUser.uid}/places`).doc(placeId).set(
+        { logoUrl: url },
+        { merge: true }
+      );
+      // Update cache
+      _placeLogos[placeId] = url;
+      // Update the logo in the open detail sheet
+      const wrap = document.querySelector('.place-logo-wrap');
+      if (wrap) {
+        const existing = wrap.querySelector('.place-logo-img, .place-logo-default');
+        if (existing) existing.outerHTML = `<img src="${esc(url)}" class="place-logo-img" />`;
+      }
+      // Update the place doc in _placesAll cache
+      const cached = _placesAll.find(p => (p.placeId || p.id) === placeId);
+      if (cached) cached.logoUrl = url;
+      toast('Logo updated ✓', 'success');
+    } catch(e) {
+      console.error('changePlaceLogo:', e);
+      toast('Logo upload failed — try again.', 'error');
+    }
+  };
+  input.click();
 }
 
 // ── Wishlist ──────────────────────────────────────────────────
@@ -1234,14 +1399,15 @@ async function saveEntry() {
         isWishlist:  false,
       }, { merge: true });
 
+      await batch.commit();
+
+      // Must run AFTER batch so the place doc exists for new places
       await placeRef.update({
         ratingHistory: firebase.firestore.FieldValue.arrayUnion({
           date:   dateInput,
           rating: selectedRating,
         }),
       }).catch(() => {});
-
-      await batch.commit();
 
       toast('Pizza logged! 🍕', 'success');
       navigate('home');
@@ -1445,6 +1611,50 @@ document.getElementById('photo-area').addEventListener('click', () =>
   document.getElementById('photo-input').click()
 );
 
+// ── Place/Dest detail: tap backdrop to close + swipe down to close ──
+(function() {
+  ['place-detail-overlay', 'dest-detail-overlay'].forEach(id => {
+    const overlay = document.getElementById(id);
+    if (!overlay) return;
+
+    // Tap on backdrop (outside sheet) → close
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) {
+        if (id === 'place-detail-overlay') closePlaceDetail();
+        else closeDestination();
+      }
+    });
+
+    // Swipe down on sheet → close
+    const sheet = overlay.querySelector('.place-detail-sheet');
+    if (!sheet) return;
+    let touchStartY = 0, dragging = false;
+    sheet.addEventListener('touchstart', e => {
+      touchStartY = e.touches[0].clientY;
+      dragging = true;
+    }, { passive: true });
+    sheet.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const dy = e.touches[0].clientY - touchStartY;
+      if (dy > 0) {
+        sheet.style.transform = `translateY(${Math.min(dy, 200)}px)`;
+        sheet.style.transition = 'none';
+      }
+    }, { passive: true });
+    sheet.addEventListener('touchend', e => {
+      if (!dragging) return;
+      dragging = false;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      sheet.style.transition = 'transform 0.22s ease';
+      sheet.style.transform  = '';
+      if (dy > 90) {
+        if (id === 'place-detail-overlay') closePlaceDetail();
+        else closeDestination();
+      }
+    });
+  });
+})();
+
 // ── Service Worker ────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -1598,7 +1808,7 @@ function renderPassportContent(visits, places, body) {
     ` : ''}
 
     ${ratedPlaces.length ? `
-    <div class="pp-section-label" style="margin-top:4px;">Top Rated</div>
+    <div class="pp-section-label" style="margin-top:4px;">Hall of Fame</div>
     <div class="pp-rank-list">
       ${ratedPlaces.map((p, i) => `
         <div class="pp-rank-row" onclick="openPlace('${esc(p.placeId || p.id)}')" style="cursor:pointer;">
@@ -1613,7 +1823,7 @@ function renderPassportContent(visits, places, body) {
     ` : ''}
 
     ${hof.length ? `
-    <div class="pp-section-label" style="margin-top:4px;">Hall of Fame</div>
+    <div class="pp-section-label" style="margin-top:4px;">Most Visited</div>
     <div class="pp-rank-list">
       ${hof.map((p, i) => `
         <div class="pp-rank-row" onclick="openPlace('${esc(p.placeId || p.id)}')" style="cursor:pointer;">
@@ -1663,14 +1873,16 @@ function renderPassportContent(visits, places, body) {
 }
 
 function buildPizzaChart(styleData, totalPies) {
-  const cx = 100, cy = 100, outerR = 74, innerR = 28, crustR = 83, crustW = 18;
+  const cx = 100, cy = 100, outerR = 76, crustR = 88, crustW = 16;
+  const centerR = 20; // center circle for pie count
   const total    = styleData.reduce((s, d) => s + d.count, 0);
   const isSingle = styleData.length === 1;
 
   let angle = -Math.PI / 2;
+  const gap = isSingle ? 0 : 0.07; // gap in radians between slices
+
   const segments = styleData.map(d => {
     const frac = d.count / total;
-    const gap  = isSingle ? 0 : 0.03; // radians gap → cream dough shows as "cut lines"
     const sa   = angle + gap;
     const ea   = angle + frac * 2 * Math.PI - gap;
     angle     += frac * 2 * Math.PI;
@@ -1678,14 +1890,18 @@ function buildPizzaChart(styleData, totalPies) {
     const o1y = +(cy + outerR * Math.sin(sa)).toFixed(2);
     const o2x = +(cx + outerR * Math.cos(ea)).toFixed(2);
     const o2y = +(cy + outerR * Math.sin(ea)).toFixed(2);
-    const i1x = +(cx + innerR * Math.cos(ea)).toFixed(2);
-    const i1y = +(cy + innerR * Math.sin(ea)).toFixed(2);
-    const i2x = +(cx + innerR * Math.cos(sa)).toFixed(2);
-    const i2y = +(cy + innerR * Math.sin(sa)).toFixed(2);
     const la  = frac > 0.5 ? 1 : 0;
-    const path = `M ${o1x} ${o1y} A ${outerR} ${outerR} 0 ${la} 1 ${o2x} ${o2y} L ${i1x} ${i1y} A ${innerR} ${innerR} 0 ${la} 0 ${i2x} ${i2y} Z`;
+    // Full slice from center to arc (pizza-slice shape)
+    const path = isSingle
+      ? `M ${cx} ${cy} L ${+(cx + outerR * Math.cos(sa - gap + 0.001)).toFixed(2)} ${+(cy + outerR * Math.sin(sa - gap + 0.001)).toFixed(2)} A ${outerR} ${outerR} 0 1 1 ${+(cx + outerR * Math.cos(sa - gap + 0.001 - 0.002)).toFixed(2)} ${+(cy + outerR * Math.sin(sa - gap + 0.001 - 0.002)).toFixed(2)} Z`
+      : `M ${cx} ${cy} L ${o1x} ${o1y} A ${outerR} ${outerR} 0 ${la} 1 ${o2x} ${o2y} Z`;
     return { label: d.label, count: d.count, color: STYLE_COLORS[d.label] || '#6A6A7A', path, frac };
   });
+
+  // For single-style: full circle
+  const singleFill = isSingle
+    ? `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${segments[0].color}" />`
+    : segments.map(s => `<path d="${s.path}" fill="${s.color}" />`).join('');
 
   const legend = segments.map(s => {
     const pct = Math.round(s.frac * 100);
@@ -1699,25 +1915,25 @@ function buildPizzaChart(styleData, totalPies) {
   return `
     <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:4px 0 8px;">
       <svg viewBox="0 0 200 200" width="200" height="200">
-        <!-- Dough base: warm cream circle -->
+        <!-- Cream base: shows between slice gaps -->
         <circle cx="${cx}" cy="${cy}" r="${crustR - 1}" fill="#E6DBC0" />
-        <!-- Style topping segments (donut ring, cream shows between as slice lines) -->
-        ${isSingle
-          ? `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${segments[0].color}" />`
-          : segments.map(s => `<path d="${s.path}" fill="${s.color}" />`).join('')}
-        <!-- Inner cream centre circle -->
-        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#E6DBC0" />
-        <!-- Topping dots on the centre (branded red) -->
-        <circle cx="${cx - 9}" cy="${cy - 5}" r="3.8" fill="#D85A30" opacity="0.72"/>
-        <circle cx="${cx + 7}" cy="${cy + 6}" r="3.0" fill="#D85A30" opacity="0.62"/>
-        <circle cx="${cx + 2}" cy="${cy - 11}" r="2.4" fill="#D85A30" opacity="0.55"/>
-        <!-- Amber crust ring -->
+        <!-- Pizza slices -->
+        ${singleFill}
+        <!-- Crust ring on top (cream texture ring) -->
         <circle cx="${cx}" cy="${cy}" r="${crustR}" fill="none" stroke="#C8A97E" stroke-width="${crustW}" />
-        <!-- Crust inner edge shadow -->
+        <!-- Crust inner shadow -->
         <circle cx="${cx}" cy="${cy}" r="${crustR - Math.round(crustW/2)}" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="2" />
-        <!-- Centre count -->
-        <text x="${cx}" y="${cy + 7}" text-anchor="middle" fill="#3A2A14"
-          font-family="Outfit,sans-serif" font-size="20" font-weight="600">${totalPies}</text>
+        <!-- Topping dots (scattered across pizza body) -->
+        <circle cx="86" cy="80" r="3.5" fill="#D85A30" opacity="0.75"/>
+        <circle cx="110" cy="90" r="2.8" fill="#D85A30" opacity="0.65"/>
+        <circle cx="95" cy="115" r="3.0" fill="#D85A30" opacity="0.70"/>
+        <circle cx="78" cy="108" r="2.4" fill="#D85A30" opacity="0.60"/>
+        <circle cx="118" cy="112" r="2.4" fill="#D85A30" opacity="0.60"/>
+        <circle cx="105" cy="75" r="2.0" fill="#D85A30" opacity="0.55"/>
+        <!-- Center circle -->
+        <circle cx="${cx}" cy="${cy}" r="${centerR}" fill="#E6DBC0" />
+        <text x="${cx}" y="${cy + 6}" text-anchor="middle" fill="#3A2A14"
+          font-family="Outfit,sans-serif" font-size="16" font-weight="600">${totalPies}</text>
       </svg>
       <div class="donut-legend" style="width:100%;padding:0 4px;">${legend}</div>
     </div>`;

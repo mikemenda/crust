@@ -1654,17 +1654,20 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
 }
 .home-photo-cell:active img { opacity: .7; }
 
-/* ── FEED CONTROLS (filter + sort with labels) ───────────────── */
+/* ── FEED CONTROLS (filter + sort side by side) ──────────────── */
 .feed-controls {
   padding: 0 16px 12px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 .feed-control-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
+  flex-shrink: 0;
 }
 .feed-control-label {
   font-size: 9px;
@@ -1673,15 +1676,11 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   text-transform: uppercase;
   color: var(--amber);
   flex-shrink: 0;
-  width: 34px;
 }
 .feed-control-pills {
   display: flex;
-  gap: 7px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  flex: 1;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .feed-control-pills::-webkit-scrollbar { display: none; }
 
@@ -1692,3 +1691,116 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
 }
 .dest-spot-row[onclick]:active { background: var(--bg-elevated); }
 .pp-rank-row[onclick]:active { background: var(--bg-elevated); border-radius: var(--r-sm); }
+
+/* ── PLACE LOGO — Entry cards ────────────────────────────────── */
+.entry-place-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  min-width: 0;
+}
+.entry-place-logo {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--cream-06);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.entry-place-logo--default {
+  background: var(--bg-elevated);
+  border: 1px solid var(--cream-06);
+  padding: 1px;
+}
+/* Keep .entry-place truncation working inside the row */
+.entry-place-row .entry-place {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── PLACE LOGO — Place cards ────────────────────────────────── */
+.place-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.place-card-logo {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--cream-06);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.place-card-logo--default {
+  background: var(--bg-elevated);
+  border: 1px solid var(--cream-06);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.place-card-name-row .place-card-name {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── PLACE LOGO — Place Detail ───────────────────────────────── */
+.place-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.place-logo-wrap {
+  flex-shrink: 0;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--cream-06);
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .15s;
+}
+.place-logo-wrap:active { border-color: var(--amber); }
+.place-logo-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.place-logo-default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+.place-logo-edit-hint {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 18px; height: 18px;
+  background: var(--amber);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bg);
+}
+.place-detail-title-group { flex: 1; min-width: 0; }
+.place-detail-title-group .place-detail-name { margin-bottom: 2px; }
+.place-detail-title-group .place-detail-location { margin-bottom: 0; }
