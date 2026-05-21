@@ -256,8 +256,8 @@
       <div class="header-right">
         <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
           </svg>
         </button>
         <div id="avatar-wrap"><div class="avatar-initial">?</div></div>
@@ -297,14 +297,13 @@
       </div>
     </div>
 
-    <!-- Photo strip (hidden until photos exist) -->
+    <!-- Photo Feed grid (hidden until photos exist) -->
     <div id="home-photo-strip-section" style="display:none;">
-      <div class="section-header" style="padding-bottom:8px;">
-        <span class="section-label">Feed</span>
-        <button class="btn-see-all" onclick="navigate('feed')">See all</button>
+      <div class="section-header">
+        <span class="section-label">Photo Feed</span>
+        <button class="btn-see-all" onclick="navigate('feed')">See all →</button>
       </div>
-      <div id="home-photo-strip" class="home-photo-strip"></div>
-      <div style="height:16px;"></div>
+      <div id="home-photo-grid" class="home-photo-grid"></div>
     </div>
 
     <!-- Recent entries -->
@@ -435,6 +434,12 @@
   <div id="screen-journey" class="screen">
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Journey</span>
+      <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
     </header>
 
     <!-- Search -->
@@ -470,6 +475,12 @@
   <div id="screen-places" class="screen">
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Places</span>
+      <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
     </header>
 
     <!-- Tabs -->
@@ -512,12 +523,19 @@
         <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Feed</span>
       </div>
     </header>
-    <!-- Filter pills -->
-    <div class="journey-filters" id="feed-filters" style="padding-bottom:4px;"></div>
-    <!-- Sort pills -->
-    <div class="journey-filters" id="feed-sort-row" style="padding-bottom:10px;">
-      <button class="filter-pill active" data-sort="date" onclick="setFeedSort('date')">Date</button>
-      <button class="filter-pill" data-sort="rating" onclick="setFeedSort('rating')">Rating</button>
+    <!-- Filter + Sort with clear labels -->
+    <div class="feed-controls">
+      <div class="feed-control-row" id="feed-filters-row" style="display:none;">
+        <span class="feed-control-label">Filter</span>
+        <div class="feed-control-pills" id="feed-filters"></div>
+      </div>
+      <div class="feed-control-row">
+        <span class="feed-control-label">Sort</span>
+        <div class="feed-control-pills" id="feed-sort-row">
+          <button class="filter-pill active" data-sort="date" onclick="setFeedSort('date')">Date</button>
+          <button class="filter-pill" data-sort="rating" onclick="setFeedSort('rating')">Rating</button>
+        </div>
+      </div>
     </div>
     <!-- 3-col photo grid -->
     <div class="feed-grid" id="feed-grid"></div>
@@ -527,6 +545,12 @@
   <div id="screen-passport" class="screen">
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Passport</span>
+      <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
     </header>
     <div id="passport-body">
       <!-- populated by loadPassport() -->
@@ -687,24 +711,18 @@
   </div>
 
 
-  <!-- ─── FEED PHOTO OVERLAY ──────────────────────────── -->
+  <!-- ─── FEED PHOTO OVERLAY (Instagram-style scroll) ─────── -->
   <div id="feed-photo-overlay" class="feed-photo-overlay hidden">
-    <div class="feed-photo-topbar">
+    <div class="ifeed-topbar">
       <button class="btn-icon" onclick="closeFeedPhoto()" aria-label="Close">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
       </button>
-      <div id="feed-photo-indicator" style="font-size:12px;color:rgba(240,234,214,.45);font-family:'Outfit',sans-serif;"></div>
+      <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--amber);">Feed</span>
       <div style="width:32px;"></div>
     </div>
-    <img id="feed-photo-img" src="" class="feed-photo-full" />
-    <div class="feed-photo-meta">
-      <div class="feed-photo-place" id="feed-photo-place"></div>
-      <div class="feed-photo-sub"   id="feed-photo-sub"></div>
-      <div class="feed-photo-rating" id="feed-photo-rating"></div>
-      <div class="feed-photo-notes"  id="feed-photo-notes" style="display:none;"></div>
-    </div>
+    <div class="ifeed-scroll" id="ifeed-scroll"></div>
   </div>
 
   <!-- ─── FEED FILTER SHEET ────────────────────────────── -->

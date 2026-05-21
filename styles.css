@@ -1354,54 +1354,70 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
 }
 .feed-cell:active img { opacity: .7; }
 
-/* Feed photo full-screen overlay */
+/* Feed photo overlay — Instagram-style vertical scroll */
 .feed-photo-overlay {
   position: fixed;
   inset: 0;
-  z-index: 600;
-  background: rgba(10,10,10,.97);
+  z-index: 700;
+  background: #0a0a0a;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   animation: fadeIn .18s ease;
 }
 .feed-photo-overlay.hidden { display: none; }
-.feed-photo-topbar {
+.ifeed-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: calc(var(--safe-top) + 12px) 20px 12px;
   flex-shrink: 0;
+  background: #0a0a0a;
+  border-bottom: 1px solid rgba(240,234,214,.06);
 }
-.feed-photo-full {
+.ifeed-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--safe-bottom) + 32px);
+}
+.ifeed-post {
+  border-bottom: 1px solid rgba(240,234,214,.07);
+}
+.ifeed-photo {
   width: 100%;
-  max-height: 62vh;
-  object-fit: contain;
-  flex-shrink: 0;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
 }
-.feed-photo-meta {
-  padding: 18px 22px calc(var(--safe-bottom) + 32px);
+.ifeed-meta {
+  padding: 14px 18px 22px;
 }
-.feed-photo-place {
-  font-size: 18px;
-  font-weight: 500;
-  color: var(--cream);
-  margin-bottom: 4px;
-  line-height: 1.25;
-}
-.feed-photo-sub {
-  font-size: 12px;
-  color: var(--cream-40);
+.ifeed-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 10px;
+  gap: 10px;
 }
-.feed-photo-rating {
-  font-size: 22px;
+.ifeed-rating {
+  font-size: 26px;
   font-weight: 200;
   color: var(--amber);
-  margin-bottom: 12px;
+  line-height: 1;
+  flex-shrink: 0;
 }
-.feed-photo-notes {
+.ifeed-rating span { font-size: 13px; color: var(--cream-40); margin-left: 2px; }
+.ifeed-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.ifeed-place {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cream);
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+.ifeed-sub { font-size: 13px; color: var(--cream-40); margin-bottom: 2px; }
+.ifeed-date { font-size: 11px; color: rgba(240,234,214,.28); margin-bottom: 12px; }
+.ifeed-notes {
   font-size: 13px;
   color: rgba(240,234,214,.65);
   line-height: 1.6;
@@ -1409,6 +1425,7 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   padding: 12px 14px;
   background: rgba(255,255,255,.04);
   border-radius: 10px;
+  margin-top: 6px;
 }
 
 /* ── DESTINATIONS ───────────────────────────────────────────── */
@@ -1612,3 +1629,66 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   transition: opacity .15s;
 }
 .dest-cover-change-btn:active { opacity: .7; }
+
+/* ── HOME PHOTO GRID (Option D) ─────────────────────────────── */
+.home-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin: 0 16px 20px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.home-photo-cell {
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  cursor: pointer;
+}
+.home-photo-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity .15s;
+}
+.home-photo-cell:active img { opacity: .7; }
+
+/* ── FEED CONTROLS (filter + sort with labels) ───────────────── */
+.feed-controls {
+  padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.feed-control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.feed-control-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--amber);
+  flex-shrink: 0;
+  width: 34px;
+}
+.feed-control-pills {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+}
+.feed-control-pills::-webkit-scrollbar { display: none; }
+
+/* ── CLICKABLE PLACE NAMES ───────────────────────────────────── */
+.dest-spot-name--link {
+  color: var(--amber);
+  text-decoration: none;
+}
+.dest-spot-row[onclick]:active { background: var(--bg-elevated); }
+.pp-rank-row[onclick]:active { background: var(--bg-elevated); border-radius: var(--r-sm); }

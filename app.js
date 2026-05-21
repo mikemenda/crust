@@ -100,7 +100,7 @@ function profileMenu() {
 async function loadHome() {
   if (!currentUser) return;
   const uid = currentUser.uid;
-  await Promise.all([loadStats(uid), loadRecent(uid), loadPhotoStrip(uid)]);
+  await Promise.all([loadStats(uid), loadRecent(uid), loadPhotoGrid(uid)]);
 }
 
 async function loadStats(uid) {
@@ -181,27 +181,27 @@ function ymd(d) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-// ── Home Photo Strip ──────────────────────────────────────────
-async function loadPhotoStrip(uid) {
-  const section   = document.getElementById('home-photo-strip-section');
-  const container = document.getElementById('home-photo-strip');
-  if (!container || !section) return;
+// ── Home Photo Grid (Option D) ────────────────────────────────
+async function loadPhotoGrid(uid) {
+  const section = document.getElementById('home-photo-strip-section');
+  const grid    = document.getElementById('home-photo-grid');
+  if (!grid || !section) return;
   try {
     const snap = await db.collection(`users/${uid}/visits`)
       .orderBy('date', 'desc')
-      .limit(25)
+      .limit(30)
       .get();
     const withPhotos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(v => v.photoUrl).slice(0, 8);
+      .filter(v => v.photoUrl).slice(0, 6);
     if (!withPhotos.length) { section.style.display = 'none'; return; }
     section.style.display = '';
-    container.innerHTML = withPhotos.map(v =>
-      `<div class="strip-cell" onclick="openFeedFromPhoto('${v.id}')">
+    grid.innerHTML = withPhotos.map(v =>
+      `<div class="home-photo-cell" onclick="openFeedFromPhoto('${v.id}')">
         <img src="${esc(v.photoUrl)}" loading="lazy" />
       </div>`
     ).join('');
   } catch(e) {
-    console.error('loadPhotoStrip:', e);
+    console.error('loadPhotoGrid:', e);
     if (section) section.style.display = 'none';
   }
 }
@@ -1454,9 +1454,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Init swipe on feed photo overlay (once DOM is ready)
-window.addEventListener('load', () => { initFeedPhotoSwipe(); });
-
 // ── Helpers ───────────────────────────────────────────────────
 function esc(s) {
   if (!s) return '';
@@ -1601,10 +1598,10 @@ function renderPassportContent(visits, places, body) {
     ` : ''}
 
     ${ratedPlaces.length ? `
-    <div class="pp-section-label" style="margin-top:4px;">Top 10 Rated</div>
+    <div class="pp-section-label" style="margin-top:4px;">Top Rated</div>
     <div class="pp-rank-list">
       ${ratedPlaces.map((p, i) => `
-        <div class="pp-rank-row">
+        <div class="pp-rank-row" onclick="openPlace('${esc(p.placeId || p.id)}')" style="cursor:pointer;">
           <div class="pp-rank-num">${i + 1}</div>
           <div class="pp-rank-body">
             <div class="pp-rank-name">${esc(p.name || 'Unknown')}</div>
@@ -1619,7 +1616,7 @@ function renderPassportContent(visits, places, body) {
     <div class="pp-section-label" style="margin-top:4px;">Hall of Fame</div>
     <div class="pp-rank-list">
       ${hof.map((p, i) => `
-        <div class="pp-rank-row">
+        <div class="pp-rank-row" onclick="openPlace('${esc(p.placeId || p.id)}')" style="cursor:pointer;">
           <div class="pp-rank-num">${i + 1}</div>
           <div class="pp-rank-body">
             <div class="pp-rank-name">${esc(p.name || 'Unknown')}</div>
@@ -1666,59 +1663,67 @@ function renderPassportContent(visits, places, body) {
 }
 
 function buildPizzaChart(styleData, totalPies) {
-  const cx = 80, cy = 80, r = 62;
-  const total = styleData.reduce((s, d) => s + d.count, 0);
+  const cx = 100, cy = 100, outerR = 74, innerR = 28, crustR = 83, crustW = 18;
+  const total    = styleData.reduce((s, d) => s + d.count, 0);
+  const isSingle = styleData.length === 1;
 
-  // Build slices — handle single-style (100%) as a full circle
   let angle = -Math.PI / 2;
-  const slices = styleData.map(d => {
-    const frac  = d.count / total;
-    const start = angle;
-    const end   = angle + frac * 2 * Math.PI;
-    angle = end;
-    const x1 = cx + r * Math.cos(start);
-    const y1 = cy + r * Math.sin(start);
-    const x2 = cx + r * Math.cos(end);
-    const y2 = cy + r * Math.sin(end);
+  const segments = styleData.map(d => {
+    const frac = d.count / total;
+    const gap  = isSingle ? 0 : 0.03; // radians gap → cream dough shows as "cut lines"
+    const sa   = angle + gap;
+    const ea   = angle + frac * 2 * Math.PI - gap;
+    angle     += frac * 2 * Math.PI;
+    const o1x = +(cx + outerR * Math.cos(sa)).toFixed(2);
+    const o1y = +(cy + outerR * Math.sin(sa)).toFixed(2);
+    const o2x = +(cx + outerR * Math.cos(ea)).toFixed(2);
+    const o2y = +(cy + outerR * Math.sin(ea)).toFixed(2);
+    const i1x = +(cx + innerR * Math.cos(ea)).toFixed(2);
+    const i1y = +(cy + innerR * Math.sin(ea)).toFixed(2);
+    const i2x = +(cx + innerR * Math.cos(sa)).toFixed(2);
+    const i2y = +(cy + innerR * Math.sin(sa)).toFixed(2);
     const la  = frac > 0.5 ? 1 : 0;
-    // Single style = full circle (degenerate arc workaround)
-    const path = (total === d.count)
-      ? `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2*r} 0 a ${r} ${r} 0 1 0 -${2*r} 0`
-      : `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${la} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+    const path = `M ${o1x} ${o1y} A ${outerR} ${outerR} 0 ${la} 1 ${o2x} ${o2y} L ${i1x} ${i1y} A ${innerR} ${innerR} 0 ${la} 0 ${i2x} ${i2y} Z`;
     return { label: d.label, count: d.count, color: STYLE_COLORS[d.label] || '#6A6A7A', path, frac };
   });
 
-  const legend = slices.map(s => {
+  const legend = segments.map(s => {
     const pct = Math.round(s.frac * 100);
     return `<div class="donut-legend-item">
       <div class="donut-dot" style="background:${s.color}"></div>
       <span class="donut-lbl">${esc(s.label)}</span>
-      <span class="donut-cnt">${pct}%</span>
+      <span class="donut-cnt">${pct}% <span style="opacity:.5;font-size:11px;font-weight:400;">(${s.count})</span></span>
     </div>`;
   }).join('');
 
   return `
     <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:4px 0 8px;">
-      <svg viewBox="0 0 160 160" width="200" height="200">
-        <!-- Colored style slices -->
-        ${slices.map(s => `<path d="${s.path}" fill="${s.color}" />`).join('')}
-        <!-- Subtle slice dividers -->
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#141414" stroke-width="0.8" opacity="0.35"/>
-        <!-- Amber pizza crust ring -->
-        <circle cx="${cx}" cy="${cy}" r="68" fill="none" stroke="#C8A97E" stroke-width="9" />
-        <!-- Center medallion -->
-        <circle cx="${cx}" cy="${cy}" r="26" fill="rgba(20,20,20,0.82)" />
-        <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#F0EAD6"
-          font-family="Outfit,sans-serif" font-size="22" font-weight="200">${totalPies}</text>
-        <text x="${cx}" y="${cy + 13}" text-anchor="middle" fill="rgba(240,234,214,0.4)"
-          font-family="Outfit,sans-serif" font-size="7.5" font-weight="600" letter-spacing="1.5">PIES</text>
+      <svg viewBox="0 0 200 200" width="200" height="200">
+        <!-- Dough base: warm cream circle -->
+        <circle cx="${cx}" cy="${cy}" r="${crustR - 1}" fill="#E6DBC0" />
+        <!-- Style topping segments (donut ring, cream shows between as slice lines) -->
+        ${isSingle
+          ? `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${segments[0].color}" />`
+          : segments.map(s => `<path d="${s.path}" fill="${s.color}" />`).join('')}
+        <!-- Inner cream centre circle -->
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#E6DBC0" />
+        <!-- Topping dots on the centre (branded red) -->
+        <circle cx="${cx - 9}" cy="${cy - 5}" r="3.8" fill="#D85A30" opacity="0.72"/>
+        <circle cx="${cx + 7}" cy="${cy + 6}" r="3.0" fill="#D85A30" opacity="0.62"/>
+        <circle cx="${cx + 2}" cy="${cy - 11}" r="2.4" fill="#D85A30" opacity="0.55"/>
+        <!-- Amber crust ring -->
+        <circle cx="${cx}" cy="${cy}" r="${crustR}" fill="none" stroke="#C8A97E" stroke-width="${crustW}" />
+        <!-- Crust inner edge shadow -->
+        <circle cx="${cx}" cy="${cy}" r="${crustR - Math.round(crustW/2)}" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="2" />
+        <!-- Centre count -->
+        <text x="${cx}" y="${cy + 7}" text-anchor="middle" fill="#3A2A14"
+          font-family="Outfit,sans-serif" font-size="20" font-weight="600">${totalPies}</text>
       </svg>
       <div class="donut-legend" style="width:100%;padding:0 4px;">${legend}</div>
     </div>`;
 }
 
 function buildDonutChart(styleData, totalPies) {
-  // Legacy — redirects to pizza chart
   return buildPizzaChart(styleData, totalPies);
 }
 
@@ -1763,7 +1768,8 @@ async function loadFeed() {
 }
 
 function renderFeedFilterPills() {
-  const row = document.getElementById('feed-filters');
+  const row       = document.getElementById('feed-filters');
+  const filterRow = document.getElementById('feed-filters-row');
   if (!row) return;
   const pills = [];
   const pill = (key, label) => {
@@ -1773,6 +1779,7 @@ function renderFeedFilterPills() {
   if (_feedFilterOpts.cities.length > 1) pill('city',  'City');
   if (_feedFilterOpts.styles.length > 0) pill('style', 'Style');
   row.innerHTML = pills.join('');
+  if (filterRow) filterRow.style.display = pills.length ? 'flex' : 'none';
 }
 
 function renderFeedGrid() {
@@ -1841,83 +1848,50 @@ function closeFeedFilterSheet() {
 }
 
 function openFeedPhoto(id) {
-  // Build the current filtered+sorted list for swipe nav
   let visits = _feedVisits;
   if (_feedFilters.city)  visits = visits.filter(v => v.city === _feedFilters.city);
   if (_feedFilters.style) visits = visits.filter(v => (v.styles || []).includes(_feedFilters.style));
   if (_feedSort === 'rating') visits = [...visits].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
   _feedCurrentFilteredList = visits;
-  _feedCurrentIdx = visits.findIndex(x => x.id === id);
-  if (_feedCurrentIdx < 0) _feedCurrentIdx = 0;
-  renderFeedPhotoOverlay();
-}
 
-function renderFeedPhotoOverlay() {
-  const v = _feedCurrentFilteredList[_feedCurrentIdx];
-  if (!v) return;
-  const d    = v.date?.toDate ? v.date.toDate() : new Date(v.date);
-  const dStr = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const loc  = [v.city, v.country].filter(Boolean).join(', ');
-  document.getElementById('feed-photo-img').src            = v.photoUrl;
-  document.getElementById('feed-photo-place').textContent  = v.placeName || '';
-  document.getElementById('feed-photo-sub').textContent    = [loc, dStr].filter(Boolean).join(' · ');
-  document.getElementById('feed-photo-rating').textContent = v.rating != null ? `${v.rating} / 10` : '';
-  const notesEl = document.getElementById('feed-photo-notes');
-  if (notesEl) {
-    notesEl.textContent   = v.notes || '';
-    notesEl.style.display = v.notes ? 'block' : 'none';
-  }
-  const total = _feedCurrentFilteredList.length;
-  const indEl = document.getElementById('feed-photo-indicator');
-  if (indEl) indEl.textContent = total > 1 ? `${_feedCurrentIdx + 1} / ${total}` : '';
+  const scroll = document.getElementById('ifeed-scroll');
+  if (!scroll) return;
+  scroll.innerHTML = visits.map(v => buildIFeedPost(v)).join('');
   document.getElementById('feed-photo-overlay').classList.remove('hidden');
+
+  // Scroll to the tapped photo instantly
+  requestAnimationFrame(() => {
+    const target = document.getElementById(`ifeed-post-${id}`);
+    if (target) target.scrollIntoView({ behavior: 'instant', block: 'start' });
+  });
 }
 
-function feedPhotoNext() {
-  if (_feedCurrentIdx < _feedCurrentFilteredList.length - 1) {
-    _feedCurrentIdx++;
-    renderFeedPhotoOverlay();
-  }
-}
-
-function feedPhotoPrev() {
-  if (_feedCurrentIdx > 0) {
-    _feedCurrentIdx--;
-    renderFeedPhotoOverlay();
-  }
+function buildIFeedPost(v) {
+  const d    = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+  const dStr = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const loc  = [v.city, v.country].filter(Boolean).join(', ');
+  const tags = (v.styles || []).map(s => `<span class="style-tag">${esc(s)}</span>`).join('');
+  return `
+    <div class="ifeed-post" id="ifeed-post-${v.id}">
+      <img src="${esc(v.photoUrl)}" class="ifeed-photo" loading="lazy" />
+      <div class="ifeed-meta">
+        <div class="ifeed-top-row">
+          ${v.rating != null ? `<div class="ifeed-rating">${v.rating}<span> / 10</span></div>` : '<div></div>'}
+          ${tags ? `<div class="ifeed-tags">${tags}</div>` : ''}
+        </div>
+        <div class="ifeed-place">${esc(v.placeName || 'Unknown')}</div>
+        ${loc ? `<div class="ifeed-sub">${esc(loc)}</div>` : ''}
+        ${dStr ? `<div class="ifeed-date">${dStr}</div>` : ''}
+        ${v.notes ? `<div class="ifeed-notes">${esc(v.notes)}</div>` : ''}
+      </div>
+    </div>`;
 }
 
 function closeFeedPhoto() {
   document.getElementById('feed-photo-overlay').classList.add('hidden');
-  document.getElementById('feed-photo-img').src = '';
+  const scroll = document.getElementById('ifeed-scroll');
+  if (scroll) scroll.innerHTML = ''; // free image memory
   _feedCurrentFilteredList = [];
-  _feedCurrentIdx = 0;
-}
-
-function setFeedSort(sort) {
-  _feedSort = sort;
-  document.querySelectorAll('#feed-sort-row .filter-pill').forEach(p =>
-    p.classList.toggle('active', p.dataset.sort === sort));
-  renderFeedGrid();
-}
-
-function initFeedPhotoSwipe() {
-  const overlay = document.getElementById('feed-photo-overlay');
-  if (!overlay || overlay._swipeInit) return;
-  overlay._swipeInit = true;
-  let sx = 0, sy = 0;
-  overlay.addEventListener('touchstart', e => {
-    sx = e.touches[0].clientX;
-    sy = e.touches[0].clientY;
-  }, { passive: true });
-  overlay.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - sx;
-    const dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) > Math.abs(dy) + 10 && Math.abs(dx) > 48) {
-      if (dx < 0) feedPhotoNext();
-      else         feedPhotoPrev();
-    }
-  }, { passive: true });
 }
 
 // ── DESTINATIONS ──────────────────────────────────────────────
@@ -2035,7 +2009,7 @@ async function openDestination(idx) {
   const placeMap = {};
   mine.forEach(v => {
     const pid = v.placeId || ('noplace_' + v.id);
-    if (!placeMap[pid]) placeMap[pid] = { name: v.placeName, city: v.city, country: v.country, visits: [], ratings: [] };
+    if (!placeMap[pid]) placeMap[pid] = { placeId: pid, name: v.placeName, city: v.city, country: v.country, visits: [], ratings: [] };
     placeMap[pid].visits.push(v);
     if (v.rating != null) placeMap[pid].ratings.push(v.rating);
   });
@@ -2080,10 +2054,12 @@ async function openDestination(idx) {
 
     <div class="place-section-label" style="margin-top:${bestRated ? '20px' : '0'};">All Spots</div>
     ${placeList.map(p => {
-      const avg = p.ratings.length ? (p.ratings.reduce((s, r) => s + r, 0) / p.ratings.length) : null;
-      return `<div class="dest-spot-row">
+      const avg       = p.ratings.length ? (p.ratings.reduce((s, r) => s + r, 0) / p.ratings.length) : null;
+      const tappable  = p.placeId && !p.placeId.startsWith('noplace_');
+      const clickAttr = tappable ? `onclick="openPlace('${esc(p.placeId)}')" style="cursor:pointer;"` : '';
+      return `<div class="dest-spot-row" ${clickAttr}>
         <div class="dest-spot-body">
-          <div class="dest-spot-name">${esc(p.name || 'Unknown')}</div>
+          <div class="dest-spot-name${tappable ? ' dest-spot-name--link' : ''}">${esc(p.name || 'Unknown')}</div>
           <div class="dest-spot-sub">${p.visits.length} ${p.visits.length === 1 ? 'visit' : 'visits'}</div>
         </div>
         ${avg !== null ? `<div class="dest-spot-rating">${avg.toFixed(1)}</div>` : ''}
