@@ -1859,3 +1859,102 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
     transform: scale(1) rotate(0deg);
   }
 }
+
+/* ── GLOBE TEASER CARD (Home) ────────────────────────────────── */
+#home-globe-section { /* always shown */ }
+
+.globe-teaser-card {
+  margin: 0 16px 20px;
+  background: var(--bg-card);
+  border-radius: var(--r-lg);
+  padding: 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity .15s;
+}
+.globe-teaser-card:active { opacity: .78; }
+.globe-teaser-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 16px; right: 16px;
+  height: 1px;
+  background: var(--amber);
+  opacity: .22;
+}
+.globe-teaser-icon {
+  color: var(--amber);
+  opacity: .7;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.globe-teaser-info { flex: 1; min-width: 0; }
+.globe-teaser-num {
+  font-size: 32px;
+  font-weight: 200;
+  color: var(--cream);
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+.globe-teaser-label {
+  font-size: 11px;
+  color: var(--cream-40);
+  margin-top: 2px;
+  letter-spacing: .2px;
+}
+.globe-teaser-sub {
+  font-size: 11px;
+  color: var(--amber);
+  margin-top: 3px;
+  font-weight: 400;
+}
+
+/* ── GLOBE OVERLAY (full-screen) ─────────────────────────────── */
+.globe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  background: #141414;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn .18s ease;
+}
+.globe-overlay.hidden { display: none; }
+
+.globe-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--safe-top) + 14px) 20px 14px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.globe-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  /* globe.gl renders a canvas here; let it fill */
+}
+.globe-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.globe-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--cream-40);
+  letter-spacing: .3px;
+}

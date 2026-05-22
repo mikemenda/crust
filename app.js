@@ -23,6 +23,8 @@ let _feedSort                = 'date'; // 'date' | 'rating'
 let _feedCurrentFilteredList = [];    // currently visible photos for swipe nav
 let _feedCurrentIdx          = 0;
 let _placeLogos              = {};    // placeId → logoUrl (cached for entry cards)
+let _globeInstance           = null;  // globe.gl instance
+let _globeLoaded             = false; // true once globe.gl has been initialized
 
 // ── Toast ────────────────────────────────────────────────────
 function toast(msg, type = '') {
@@ -130,6 +132,7 @@ async function loadStats(uid) {
     set('stat-countries', countries);
     set('stat-streak',   streak);
     set('streak-status', streakLabel(streak, _streakStartDate));
+    updateGlobeTeaser(visits);
   } catch (e) {
     console.error('loadStats:', e);
   }
@@ -2050,7 +2053,7 @@ function buildPizzaChart(styleData, totalPies) {
 
   return `
     <div style="display:flex;flex-direction:column;align-items:center;gap:26px;padding:10px 0 8px;">
-      <svg viewBox="-60 -60 360 360" width="260" height="260" style="display:block;margin:0 auto;" class="pizza-chart-svg">
+      <svg viewBox="-60 -60 360 360" width="100%" style="max-width:300px;display:block;margin:0 auto;" class="pizza-chart-svg">
         <defs>
           <filter id="pizzaShadow" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.38)"/>
@@ -2461,4 +2464,132 @@ async function changeDestCover(coverKey) {
 
 function closeDestination() {
   document.getElementById('dest-detail-overlay').classList.add('hidden');
+}
+
+// ── WORLD MAP / GLOBE ─────────────────────────────────────────
+
+function updateGlobeTeaser(visits) {
+  const pinsEl = document.getElementById('globe-teaser-pins');
+  const geoEl  = document.getElementById('globe-teaser-geo');
+  if (!pinsEl || !geoEl) return;
+  const mapped       = visits.filter(v => v.lat != null && v.lng != null);
+  const uniquePlaces = new Set(mapped.map(v => v.placeId).filter(Boolean));
+  const countries    = new Set(mapped.map(v => v.country).filter(Boolean));
+  const cities       = new Set(mapped.map(v => v.city).filter(Boolean));
+  pinsEl.textContent = uniquePlaces.size || mapped.length || 0;
+  const parts = [];
+  if (countries.size) parts.push(`${countries.size} ${countries.size === 1 ? 'country' : 'countries'}`);
+  if (cities.size)    parts.push(`${cities.size} ${cities.size === 1 ? 'city' : 'cities'}`);
+  geoEl.textContent = parts.join(' · ');
+}
+
+function openGlobe() {
+  document.getElementById('globe-overlay').classList.remove('hidden');
+  if (!_globeLoaded) {
+    requestAnimationFrame(() => initGlobe());
+  }
+}
+
+function closeGlobe() {
+  document.getElementById('globe-overlay').classList.add('hidden');
+}
+
+function loadGlobeScript() {
+  return new Promise((resolve, reject) => {
+    if (window.Globe) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/globe.gl@2/dist/globe.gl.min.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function initGlobe() {
+  const container = document.getElementById('globe-container');
+  if (!container || !currentUser) return;
+  container.innerHTML = '<div class="globe-loading">Loading map…</div>';
+
+  try {
+    await loadGlobeScript();
+
+    const snap   = await db.collection(`users/${currentUser.uid}/visits`).get();
+    const visits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Deduplicate by placeId — only entries with coordinates
+    const placeMap = {};
+    visits.forEach(v => {
+      if (!v.placeId || v.lat == null || v.lng == null) return;
+      const pid = v.placeId;
+      if (!placeMap[pid]) {
+        placeMap[pid] = {
+          placeId:    pid,
+          name:       v.placeName || 'Unknown',
+          city:       v.city    || '',
+          country:    v.country || '',
+          lat:        v.lat,
+          lng:        v.lng,
+          visitCount: 0,
+          ratings:    [],
+        };
+      }
+      placeMap[pid].visitCount++;
+      if (v.rating != null) placeMap[pid].ratings.push(v.rating);
+    });
+
+    const points = Object.values(placeMap);
+    container.innerHTML = '';
+
+    const W = container.offsetWidth;
+    const H = container.offsetHeight;
+
+    _globeInstance = Globe()
+      (container)
+      .width(W)
+      .height(H)
+      .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+      .backgroundColor('#141414')
+      .showAtmosphere(true)
+      .atmosphereColor('#C8A97E')
+      .atmosphereAltitude(0.14)
+      .pointsData(points)
+      .pointLat('lat')
+      .pointLng('lng')
+      .pointColor(() => '#C8A97E')
+      .pointAltitude(0.018)
+      .pointRadius(p => Math.max(0.38, Math.min(1.4, 0.38 + (p.visitCount - 1) * 0.18)))
+      .pointLabel(p => {
+        const avg = p.ratings.length
+          ? (p.ratings.reduce((s, r) => s + r, 0) / p.ratings.length).toFixed(1)
+          : null;
+        return `<div style="font-family:Outfit,sans-serif;background:rgba(20,20,20,.94);padding:9px 13px;border-radius:12px;border:1px solid rgba(200,169,126,.3);color:#F0EAD6;font-size:13px;max-width:180px;pointer-events:none;">
+          <div style="font-weight:500;line-height:1.3;">${esc(p.name)}</div>
+          <div style="color:rgba(240,234,214,.5);font-size:11px;margin-top:3px;">${[p.city, p.country].filter(Boolean).map(s => esc(s)).join(' · ')}</div>
+          <div style="margin-top:5px;display:flex;align-items:center;gap:8px;">
+            <span style="color:#C8A97E;font-size:12px;">${avg ? avg + ' / 10' : ''}</span>
+            <span style="color:rgba(240,234,214,.35);font-size:11px;">${p.visitCount} ${p.visitCount === 1 ? 'visit' : 'visits'}</span>
+          </div>
+        </div>`;
+      })
+      .onPointClick(p => {
+        closeGlobe();
+        setTimeout(() => openPlace(p.placeId), 320);
+      });
+
+    // Auto-rotate; stop on user touch
+    const ctrl = _globeInstance.controls();
+    ctrl.autoRotate      = true;
+    ctrl.autoRotateSpeed = 0.7;
+    ctrl.enableZoom      = true;
+    ctrl.minDistance     = 140;
+    ctrl.maxDistance     = 580;
+    ctrl.addEventListener('start', () => { ctrl.autoRotate = false; });
+
+    _globeLoaded = true;
+
+  } catch (e) {
+    console.error('initGlobe:', e);
+    const c = document.getElementById('globe-container');
+    if (c) c.innerHTML = '<div class="globe-loading">Couldn\'t load map.</div>';
+  }
 }

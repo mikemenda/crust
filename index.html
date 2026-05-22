@@ -254,6 +254,13 @@
         <span class="wordmark" style="font-size:18px; letter-spacing:3.5px;">CRUST</span>
       </div>
       <div class="header-right">
+        <button class="btn-icon" onclick="openGlobe()" aria-label="World map" style="color:rgba(240,234,214,.45);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </button>
         <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
@@ -306,6 +313,31 @@
         <button class="btn-see-all" onclick="navigate('feed')">See all →</button>
       </div>
       <div id="home-photo-grid" class="home-photo-grid"></div>
+    </div>
+
+    <!-- Globe teaser -->
+    <div id="home-globe-section">
+      <div class="section-header">
+        <span class="section-label">World Map</span>
+        <button class="btn-see-all" onclick="openGlobe()">Explore →</button>
+      </div>
+      <div class="globe-teaser-card" onclick="openGlobe()">
+        <div class="globe-teaser-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </div>
+        <div class="globe-teaser-info">
+          <div class="globe-teaser-num" id="globe-teaser-pins">—</div>
+          <div class="globe-teaser-label">spots on your pizza map</div>
+          <div class="globe-teaser-sub" id="globe-teaser-geo"></div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.28;flex-shrink:0;">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
     </div>
 
     <!-- Recent entries -->
@@ -438,14 +470,23 @@
   <div id="screen-journey" class="screen">
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Journey</span>
-      <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
-          <rect x="2" y="7" width="16" height="14" rx="2"/>
-          <circle cx="7" cy="13" r="1.5"/>
-          <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
-        </svg>
-      </button>
+      <div class="header-right">
+        <button class="btn-icon" onclick="openGlobe()" aria-label="World map" style="color:rgba(240,234,214,.45);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </button>
+        <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
+            <rect x="2" y="7" width="16" height="14" rx="2"/>
+            <circle cx="7" cy="13" r="1.5"/>
+            <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Search -->
@@ -481,14 +522,23 @@
   <div id="screen-places" class="screen">
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Places</span>
-      <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
-          <rect x="2" y="7" width="16" height="14" rx="2"/>
-          <circle cx="7" cy="13" r="1.5"/>
-          <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
-        </svg>
-      </button>
+      <div class="header-right">
+        <button class="btn-icon" onclick="openGlobe()" aria-label="World map" style="color:rgba(240,234,214,.45);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </button>
+        <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
+            <rect x="2" y="7" width="16" height="14" rx="2"/>
+            <circle cx="7" cy="13" r="1.5"/>
+            <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Tabs -->
@@ -553,14 +603,23 @@
   <div id="screen-passport" class="screen">
     <header class="app-header">
       <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Passport</span>
-      <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
-          <rect x="2" y="7" width="16" height="14" rx="2"/>
-          <circle cx="7" cy="13" r="1.5"/>
-          <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
-        </svg>
-      </button>
+      <div class="header-right">
+        <button class="btn-icon" onclick="openGlobe()" aria-label="World map" style="color:rgba(240,234,214,.45);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </button>
+        <button class="btn-icon" onclick="navigate('feed')" aria-label="Photo feed" style="color:rgba(240,234,214,.45);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
+            <rect x="2" y="7" width="16" height="14" rx="2"/>
+            <circle cx="7" cy="13" r="1.5"/>
+            <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
+          </svg>
+        </button>
+      </div>
     </header>
     <div id="passport-body">
       <!-- populated by loadPassport() -->
@@ -733,6 +792,20 @@
       <div style="width:32px;"></div>
     </div>
     <div class="ifeed-scroll" id="ifeed-scroll"></div>
+  </div>
+
+  <!-- ─── GLOBE OVERLAY ────────────────────────────────────── -->
+  <div id="globe-overlay" class="globe-overlay hidden">
+    <div class="globe-topbar">
+      <button class="btn-icon" onclick="closeGlobe()" aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--amber);">World Map</span>
+      <div style="width:32px;"></div>
+    </div>
+    <div id="globe-container" class="globe-container"></div>
   </div>
 
   <!-- ─── FEED FILTER SHEET ────────────────────────────── -->
