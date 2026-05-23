@@ -2540,6 +2540,21 @@ async function initGlobe() {
     const points = Object.values(placeMap);
     container.innerHTML = '';
 
+    // Continent & ocean labels — Tripsy-style spaced uppercase
+    const geoLabels = [
+      { lat: 48,  lng: -100, text: 'N O R T H   A M E R I C A', size: 2.2, color: 'rgba(240,234,214,0.52)' },
+      { lat: -15, lng: -55,  text: 'S O U T H   A M E R I C A', size: 2.0, color: 'rgba(240,234,214,0.52)' },
+      { lat: 52,  lng: 18,   text: 'E U R O P E',                size: 1.8, color: 'rgba(240,234,214,0.52)' },
+      { lat: 3,   lng: 22,   text: 'A F R I C A',                size: 2.0, color: 'rgba(240,234,214,0.52)' },
+      { lat: 42,  lng: 90,   text: 'A S I A',                    size: 2.5, color: 'rgba(240,234,214,0.52)' },
+      { lat: -25, lng: 134,  text: 'A U S T R A L I A',          size: 1.8, color: 'rgba(240,234,214,0.52)' },
+      { lat: 30,  lng: -38,  text: 'North Atlantic Ocean',        size: 1.1, color: 'rgba(200,169,126,0.38)' },
+      { lat: -28, lng: -18,  text: 'South Atlantic Ocean',        size: 1.1, color: 'rgba(200,169,126,0.38)' },
+      { lat: 32,  lng: -155, text: 'North Pacific Ocean',         size: 1.1, color: 'rgba(200,169,126,0.38)' },
+      { lat: -22, lng: -135, text: 'South Pacific Ocean',         size: 1.1, color: 'rgba(200,169,126,0.38)' },
+      { lat: -20, lng: 76,   text: 'Indian Ocean',                size: 1.1, color: 'rgba(200,169,126,0.38)' },
+    ];
+
     const W = container.offsetWidth;
     const H = container.offsetHeight;
 
@@ -2552,29 +2567,22 @@ async function initGlobe() {
       .showAtmosphere(true)
       .atmosphereColor('#C8A97E')
       .atmosphereAltitude(0.14)
-      .pointsData(points)
-      .pointLat('lat')
-      .pointLng('lng')
-      .pointColor(() => '#C8A97E')
-      .pointAltitude(0.018)
-      .pointRadius(p => Math.max(0.38, Math.min(1.4, 0.38 + (p.visitCount - 1) * 0.18)))
-      .pointLabel(p => {
-        const avg = p.ratings.length
-          ? (p.ratings.reduce((s, r) => s + r, 0) / p.ratings.length).toFixed(1)
-          : null;
-        return `<div style="font-family:Outfit,sans-serif;background:rgba(20,20,20,.94);padding:9px 13px;border-radius:12px;border:1px solid rgba(200,169,126,.3);color:#F0EAD6;font-size:13px;max-width:180px;pointer-events:none;">
-          <div style="font-weight:500;line-height:1.3;">${esc(p.name)}</div>
-          <div style="color:rgba(240,234,214,.5);font-size:11px;margin-top:3px;">${[p.city, p.country].filter(Boolean).map(s => esc(s)).join(' · ')}</div>
-          <div style="margin-top:5px;display:flex;align-items:center;gap:8px;">
-            <span style="color:#C8A97E;font-size:12px;">${avg ? avg + ' / 10' : ''}</span>
-            <span style="color:rgba(240,234,214,.35);font-size:11px;">${p.visitCount} ${p.visitCount === 1 ? 'visit' : 'visits'}</span>
-          </div>
-        </div>`;
-      })
-      .onPointClick(p => {
-        closeGlobe();
-        setTimeout(() => openPlace(p.placeId), 320);
-      });
+      // Continent & ocean labels
+      .labelsData(geoLabels)
+      .labelLat('lat')
+      .labelLng('lng')
+      .labelText('text')
+      .labelSize(d => d.size)
+      .labelColor(d => d.color)
+      .labelDotRadius(0)
+      .labelAltitude(0.002)
+      .labelResolution(2)
+      // Pizza map pins
+      .htmlElementsData(points)
+      .htmlLat('lat')
+      .htmlLng('lng')
+      .htmlAltitude(0.01)
+      .htmlElement(d => buildGlobePin(d));
 
     // Auto-rotate; stop on user touch
     const ctrl = _globeInstance.controls();
@@ -2592,4 +2600,39 @@ async function initGlobe() {
     const c = document.getElementById('globe-container');
     if (c) c.innerHTML = '<div class="globe-loading">Couldn\'t load map.</div>';
   }
+}
+
+// Pizza teardrop map pin — red body, Crust pizza SVG inside, amber badge for repeat visits
+function buildGlobePin(d) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:relative;display:inline-block;cursor:pointer;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.6));';
+
+  // Teardrop pin with Crust pizza logo inside.
+  // Pizza paths from brand spec scaled to fit in the 28px-wide pin circle.
+  // Original pizza center ≈ (40,50) in 100×100 space; scale 0.3929 → fits in r=11px circle.
+  // translate(-1.71,-6.64) centres the scaled pizza at pin centre (14,13).
+  el.innerHTML = `
+    <svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 0C6.3 0 0 6.3 0 14C0 24.5 14 36 14 36C14 36 28 24.5 28 14C28 6.3 21.7 0 14 0Z" fill="#D85A30"/>
+      <g transform="translate(-1.71 -6.64) scale(0.3929)">
+        <path d="M 40 50 L 63 34 A 28 28 0 1 0 63 66 Z" fill="#F0EAD6"/>
+        <path d="M 63 34 A 28 28 0 1 0 63 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        <circle cx="26" cy="42" r="3"   fill="#C8A97E" opacity="0.7"/>
+        <circle cx="22" cy="55" r="2.4" fill="#C8A97E" opacity="0.7"/>
+        <circle cx="40" cy="35" r="2.4" fill="#C8A97E" opacity="0.7"/>
+        <circle cx="37" cy="63" r="2.4" fill="#C8A97E" opacity="0.7"/>
+        <path d="M 64 50 L 87 34 A 28 28 0 0 1 87 66 Z" fill="#F0EAD6"/>
+        <path d="M 87 34 A 28 28 0 0 1 87 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        <circle cx="76" cy="44" r="2.2" fill="#C8A97E" opacity="0.7"/>
+        <circle cx="77" cy="57" r="2.2" fill="#C8A97E" opacity="0.7"/>
+      </g>
+    </svg>
+    ${d.visitCount > 1 ? `<div style="position:absolute;top:-4px;right:-5px;background:#C8A97E;color:#141414;border-radius:50%;width:14px;height:14px;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;line-height:1;border:1px solid rgba(20,20,20,0.3);">${d.visitCount}</div>` : ''}
+  `;
+
+  el.addEventListener('click', () => {
+    closeGlobe();
+    setTimeout(() => openPlace(d.placeId), 320);
+  });
+  return el;
 }
