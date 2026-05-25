@@ -2491,6 +2491,7 @@ function openGlobe() {
 }
 
 function closeGlobe() {
+  closeGlobePopup();
   document.getElementById('globe-overlay').classList.add('hidden');
 }
 
@@ -2540,14 +2541,26 @@ async function initGlobe() {
     const points = Object.values(placeMap);
     container.innerHTML = '';
 
-    // Continent & ocean labels — Tripsy-style spaced uppercase
+    // Fetch world GeoJSON for polygon land layer (sharp at any zoom level)
+    const geoRes  = await fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson');
+    const geoData = await geoRes.json();
+
+    // Solid-color ocean texture — never pixelates on zoom
+    const oc = document.createElement('canvas');
+    oc.width = 4; oc.height = 4;
+    const octx = oc.getContext('2d');
+    octx.fillStyle = '#0B1628';
+    octx.fillRect(0, 0, 4, 4);
+    const oceanTex = oc.toDataURL();
+
+    // Continent & ocean text labels — Tripsy-style wide-spaced uppercase
     const geoLabels = [
-      { lat: 48,  lng: -100, text: 'N O R T H   A M E R I C A', size: 2.2, color: 'rgba(240,234,214,0.52)' },
-      { lat: -15, lng: -55,  text: 'S O U T H   A M E R I C A', size: 2.0, color: 'rgba(240,234,214,0.52)' },
-      { lat: 52,  lng: 18,   text: 'E U R O P E',                size: 1.8, color: 'rgba(240,234,214,0.52)' },
-      { lat: 3,   lng: 22,   text: 'A F R I C A',                size: 2.0, color: 'rgba(240,234,214,0.52)' },
-      { lat: 42,  lng: 90,   text: 'A S I A',                    size: 2.5, color: 'rgba(240,234,214,0.52)' },
-      { lat: -25, lng: 134,  text: 'A U S T R A L I A',          size: 1.8, color: 'rgba(240,234,214,0.52)' },
+      { lat: 48,  lng: -100, text: 'N O R T H   A M E R I C A', size: 2.2, color: 'rgba(240,234,214,0.50)' },
+      { lat: -15, lng: -55,  text: 'S O U T H   A M E R I C A', size: 2.0, color: 'rgba(240,234,214,0.50)' },
+      { lat: 52,  lng: 18,   text: 'E U R O P E',                size: 1.8, color: 'rgba(240,234,214,0.50)' },
+      { lat: 3,   lng: 22,   text: 'A F R I C A',                size: 2.0, color: 'rgba(240,234,214,0.50)' },
+      { lat: 42,  lng: 90,   text: 'A S I A',                    size: 2.5, color: 'rgba(240,234,214,0.50)' },
+      { lat: -25, lng: 134,  text: 'A U S T R A L I A',          size: 1.8, color: 'rgba(240,234,214,0.50)' },
       { lat: 30,  lng: -38,  text: 'North Atlantic Ocean',        size: 1.1, color: 'rgba(200,169,126,0.38)' },
       { lat: -28, lng: -18,  text: 'South Atlantic Ocean',        size: 1.1, color: 'rgba(200,169,126,0.38)' },
       { lat: 32,  lng: -155, text: 'North Pacific Ocean',         size: 1.1, color: 'rgba(200,169,126,0.38)' },
@@ -2562,11 +2575,17 @@ async function initGlobe() {
       (container)
       .width(W)
       .height(H)
-      .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+      .globeImageUrl(oceanTex)          // solid dark ocean — zero pixelation at any zoom
       .backgroundColor('#141414')
       .showAtmosphere(true)
       .atmosphereColor('#C8A97E')
-      .atmosphereAltitude(0.14)
+      .atmosphereAltitude(0.18)
+      // Land polygons — WebGL geometry, infinitely crisp on zoom
+      .polygonsData(geoData.features)
+      .polygonCapColor(() => '#172338')
+      .polygonSideColor(() => 'transparent')
+      .polygonStrokeColor(() => 'rgba(200,169,126,0.18)')
+      .polygonAltitude(0.001)
       // Continent & ocean labels
       .labelsData(geoLabels)
       .labelLat('lat')
@@ -2575,13 +2594,13 @@ async function initGlobe() {
       .labelSize(d => d.size)
       .labelColor(d => d.color)
       .labelDotRadius(0)
-      .labelAltitude(0.002)
+      .labelAltitude(0.003)
       .labelResolution(2)
       // Pizza map pins
       .htmlElementsData(points)
       .htmlLat('lat')
       .htmlLng('lng')
-      .htmlAltitude(0.01)
+      .htmlAltitude(0.015)
       .htmlElement(d => buildGlobePin(d));
 
     // Auto-rotate; stop on user touch
@@ -2589,7 +2608,7 @@ async function initGlobe() {
     ctrl.autoRotate      = true;
     ctrl.autoRotateSpeed = 0.7;
     ctrl.enableZoom      = true;
-    ctrl.minDistance     = 140;
+    ctrl.minDistance     = 100;          // allow close zoom — polygons stay sharp
     ctrl.maxDistance     = 580;
     ctrl.addEventListener('start', () => { ctrl.autoRotate = false; });
 
@@ -2630,9 +2649,42 @@ function buildGlobePin(d) {
     ${d.visitCount > 1 ? `<div style="position:absolute;top:-4px;right:-5px;background:#C8A97E;color:#141414;border-radius:50%;width:14px;height:14px;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;line-height:1;border:1px solid rgba(20,20,20,0.3);">${d.visitCount}</div>` : ''}
   `;
 
-  el.addEventListener('click', () => {
-    closeGlobe();
-    setTimeout(() => openPlace(d.placeId), 320);
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    showGlobePopup(d);
   });
   return el;
+}
+
+// ── GLOBE PIN POPUP ───────────────────────────────────────────
+
+let _currentGlobePinPlace = null;
+
+function showGlobePopup(d) {
+  _currentGlobePinPlace = d.placeId;
+  const avg = d.ratings.length
+    ? (d.ratings.reduce((s, r) => s + r, 0) / d.ratings.length).toFixed(1)
+    : null;
+  document.getElementById('globe-pin-popup-body').innerHTML = `
+    <div class="globe-popup-name">${esc(d.name)}</div>
+    <div class="globe-popup-loc">${[d.city, d.country].filter(Boolean).map(s => esc(s)).join(' · ')}</div>
+    <div class="globe-popup-meta">
+      ${avg ? `<div class="globe-popup-rating">${avg}<span> / 10</span></div>` : ''}
+      <div class="globe-popup-visits">${d.visitCount} ${d.visitCount === 1 ? 'visit' : 'visits'}</div>
+    </div>
+  `;
+  document.getElementById('globe-pin-popup').classList.remove('hidden');
+}
+
+function closeGlobePopup() {
+  const el = document.getElementById('globe-pin-popup');
+  if (el) el.classList.add('hidden');
+  _currentGlobePinPlace = null;
+}
+
+function viewGlobePlace() {
+  const pid = _currentGlobePinPlace;
+  closeGlobePopup();
+  closeGlobe();
+  if (pid) setTimeout(() => openPlace(pid), 320);
 }

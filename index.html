@@ -806,6 +806,19 @@
       <div style="width:32px;"></div>
     </div>
     <div id="globe-container" class="globe-container"></div>
+
+    <!-- ─ Pin info popup — slides up on pin tap ─ -->
+    <div id="globe-pin-popup" class="globe-pin-popup hidden">
+      <div class="globe-pin-popup-topbar">
+        <button class="btn-icon" onclick="closeGlobePopup()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <button class="btn-detail-edit" onclick="viewGlobePlace()">View Place →</button>
+      </div>
+      <div id="globe-pin-popup-body" class="globe-pin-popup-body"></div>
+    </div>
   </div>
 
   <!-- ─── FEED FILTER SHEET ────────────────────────────── -->
