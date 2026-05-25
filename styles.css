@@ -1940,13 +1940,14 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   flex: 1;
   position: relative;
   overflow: hidden;
-  /* globe.gl renders a canvas here; let it fill */
 }
-.globe-container canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-}
+/* MapLibre GL JS overrides — hide branding, match Crust dark theme */
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-logo,
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left { display: none !important; }
+.maplibregl-canvas-container,
+.maplibregl-canvas { width: 100% !important; height: 100% !important; }
 
 .globe-loading {
   position: absolute;

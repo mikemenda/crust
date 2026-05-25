@@ -2487,6 +2487,8 @@ function openGlobe() {
   document.getElementById('globe-overlay').classList.remove('hidden');
   if (!_globeLoaded) {
     requestAnimationFrame(() => initGlobe());
+  } else if (_globeInstance && typeof _globeInstance.resize === 'function') {
+    requestAnimationFrame(() => _globeInstance.resize());
   }
 }
 
@@ -2495,11 +2497,20 @@ function closeGlobe() {
   document.getElementById('globe-overlay').classList.add('hidden');
 }
 
-function loadGlobeScript() {
+function loadMapLibre() {
   return new Promise((resolve, reject) => {
-    if (window.Globe) { resolve(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/globe.gl@2/dist/globe.gl.min.js';
+    if (window.maplibregl) { resolve(); return; }
+
+    // Inject MapLibre CSS once
+    if (!document.querySelector('link[href*="maplibre-gl"]')) {
+      const link = document.createElement('link');
+      link.rel   = 'stylesheet';
+      link.href  = 'https://unpkg.com/maplibre-gl@3/dist/maplibre-gl.css';
+      document.head.appendChild(link);
+    }
+
+    const s  = document.createElement('script');
+    s.src    = 'https://unpkg.com/maplibre-gl@3/dist/maplibre-gl.js';
     s.onload = resolve;
     s.onerror = reject;
     document.head.appendChild(s);
@@ -2512,7 +2523,7 @@ async function initGlobe() {
   container.innerHTML = '<div class="globe-loading">Loading map…</div>';
 
   try {
-    await loadGlobeScript();
+    await loadMapLibre();
 
     const snap   = await db.collection(`users/${currentUser.uid}/visits`).get();
     const visits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -2539,86 +2550,120 @@ async function initGlobe() {
     });
 
     const points = Object.values(placeMap);
-    container.innerHTML = '';
+    container.innerHTML = '';  // MapLibre takes over the container
 
-    // Fetch world GeoJSON for polygon land layer (sharp at any zoom level)
-    const geoRes  = await fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson');
-    const geoData = await geoRes.json();
+    _globeInstance = new maplibregl.Map({
+      container:        'globe-container',
+      style:            crustMapStyle(),
+      center:           [0, 20],
+      zoom:             1.5,
+      minZoom:          0.5,
+      maxZoom:          18,
+      attributionControl: false,
+      logoPosition:     'bottom-right',
+    });
 
-    // Solid-color ocean texture — never pixelates on zoom
-    const oc = document.createElement('canvas');
-    oc.width = 4; oc.height = 4;
-    const octx = oc.getContext('2d');
-    octx.fillStyle = '#0B1628';
-    octx.fillRect(0, 0, 4, 4);
-    const oceanTex = oc.toDataURL();
+    _globeInstance.on('load', () => {
+      // Globe projection — zooms into mercator at street level (MapLibre v3+)
+      try { _globeInstance.setProjection({ type: 'globe' }); } catch (_) {}
 
-    // Continent & ocean text labels — Tripsy-style wide-spaced uppercase
-    const geoLabels = [
-      { lat: 48,  lng: -100, text: 'N O R T H   A M E R I C A', size: 2.2, color: 'rgba(240,234,214,0.50)' },
-      { lat: -15, lng: -55,  text: 'S O U T H   A M E R I C A', size: 2.0, color: 'rgba(240,234,214,0.50)' },
-      { lat: 52,  lng: 18,   text: 'E U R O P E',                size: 1.8, color: 'rgba(240,234,214,0.50)' },
-      { lat: 3,   lng: 22,   text: 'A F R I C A',                size: 2.0, color: 'rgba(240,234,214,0.50)' },
-      { lat: 42,  lng: 90,   text: 'A S I A',                    size: 2.5, color: 'rgba(240,234,214,0.50)' },
-      { lat: -25, lng: 134,  text: 'A U S T R A L I A',          size: 1.8, color: 'rgba(240,234,214,0.50)' },
-      { lat: 30,  lng: -38,  text: 'North Atlantic Ocean',        size: 1.1, color: 'rgba(200,169,126,0.38)' },
-      { lat: -28, lng: -18,  text: 'South Atlantic Ocean',        size: 1.1, color: 'rgba(200,169,126,0.38)' },
-      { lat: 32,  lng: -155, text: 'North Pacific Ocean',         size: 1.1, color: 'rgba(200,169,126,0.38)' },
-      { lat: -22, lng: -135, text: 'South Pacific Ocean',         size: 1.1, color: 'rgba(200,169,126,0.38)' },
-      { lat: -20, lng: 76,   text: 'Indian Ocean',                size: 1.1, color: 'rgba(200,169,126,0.38)' },
-    ];
+      // Add Crust pizza pin markers — mathematically anchored, never drift
+      points.forEach(p => {
+        new maplibregl.Marker({ element: buildGlobePin(p), anchor: 'bottom' })
+          .setLngLat([p.lng, p.lat])
+          .addTo(_globeInstance);
+      });
 
-    const W = container.offsetWidth;
-    const H = container.offsetHeight;
+      _globeLoaded = true;
+    });
 
-    _globeInstance = Globe()
-      (container)
-      .width(W)
-      .height(H)
-      .globeImageUrl(oceanTex)          // solid dark ocean — zero pixelation at any zoom
-      .backgroundColor('#141414')
-      .showAtmosphere(true)
-      .atmosphereColor('#C8A97E')
-      .atmosphereAltitude(0.18)
-      // Land polygons — WebGL geometry, infinitely crisp on zoom
-      .polygonsData(geoData.features)
-      .polygonCapColor(() => '#172338')
-      .polygonSideColor(() => 'transparent')
-      .polygonStrokeColor(() => 'rgba(200,169,126,0.18)')
-      .polygonAltitude(0.001)
-      // Continent & ocean labels
-      .labelsData(geoLabels)
-      .labelLat('lat')
-      .labelLng('lng')
-      .labelText('text')
-      .labelSize(d => d.size)
-      .labelColor(d => d.color)
-      .labelDotRadius(0)
-      .labelAltitude(0.003)
-      .labelResolution(2)
-      // Pizza map pins
-      .htmlElementsData(points)
-      .htmlLat('lat')
-      .htmlLng('lng')
-      .htmlAltitude(0.015)
-      .htmlElement(d => buildGlobePin(d));
-
-    // Auto-rotate; stop on user touch
-    const ctrl = _globeInstance.controls();
-    ctrl.autoRotate      = true;
-    ctrl.autoRotateSpeed = 0.7;
-    ctrl.enableZoom      = true;
-    ctrl.minDistance     = 100;          // allow close zoom — polygons stay sharp
-    ctrl.maxDistance     = 580;
-    ctrl.addEventListener('start', () => { ctrl.autoRotate = false; });
-
-    _globeLoaded = true;
+    // Tap anywhere on map (not a pin) dismisses popup
+    _globeInstance.on('click', closeGlobePopup);
 
   } catch (e) {
     console.error('initGlobe:', e);
     const c = document.getElementById('globe-container');
     if (c) c.innerHTML = '<div class="globe-loading">Couldn\'t load map.</div>';
   }
+}
+
+// Crust dark map style — OpenFreeMap vector tiles (free, no API key)
+// Vector tiles = infinitely sharp at every zoom level
+// Labels (country → state → city) built into tile data, appear at the right zoom
+function crustMapStyle() {
+  return {
+    version: 8,
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sources: {
+      ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }
+    },
+    layers: [
+      // Base: land = dark navy, water = darker navy
+      { id: 'bg',    type: 'background', paint: { 'background-color': '#172338' } },
+      { id: 'water', type: 'fill', source: 'ofm', 'source-layer': 'water',
+        paint: { 'fill-color': '#0A1628' } },
+      // Country borders
+      { id: 'border-country', type: 'line', source: 'ofm', 'source-layer': 'boundary',
+        filter: ['all', ['==', 'admin_level', 2], ['!=', 'maritime', 1]],
+        paint: {
+          'line-color': 'rgba(200,169,126,0.30)',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.4, 6, 1.4],
+        } },
+      // State / province borders (zoom 3+)
+      { id: 'border-state', type: 'line', source: 'ofm', 'source-layer': 'boundary',
+        filter: ['==', 'admin_level', 4], minzoom: 3,
+        paint: {
+          'line-color': 'rgba(200,169,126,0.15)',
+          'line-width': 0.5, 'line-dasharray': [2, 3],
+        } },
+      // Country labels — always visible, uppercase, spaced
+      { id: 'label-country', type: 'symbol', source: 'ofm', 'source-layer': 'place',
+        filter: ['==', ['get', 'class'], 'country'],
+        layout: {
+          'text-field':          ['coalesce', ['get', 'name_en'], ['get', 'name']],
+          'text-font':           ['Noto Sans Regular'],
+          'text-size':           ['interpolate', ['linear'], ['zoom'], 1, 9, 5, 13],
+          'text-transform':      'uppercase',
+          'text-letter-spacing': 0.12,
+          'text-allow-overlap':  false,
+        },
+        paint: {
+          'text-color':      'rgba(240,234,214,0.75)',
+          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-halo-width': 1.5,
+        } },
+      // State / region labels (zoom 3+)
+      { id: 'label-state', type: 'symbol', source: 'ofm', 'source-layer': 'place',
+        filter: ['match', ['get', 'class'], ['state'], true, false],
+        minzoom: 3,
+        layout: {
+          'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']],
+          'text-font':  ['Noto Sans Regular'], 'text-size': 10,
+          'text-letter-spacing': 0.06, 'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color':      'rgba(240,234,214,0.52)',
+          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-halo-width': 1,
+        } },
+      // City / town labels (zoom 4+)
+      { id: 'label-city', type: 'symbol', source: 'ofm', 'source-layer': 'place',
+        filter: ['match', ['get', 'class'], ['city', 'town'], true, false],
+        minzoom: 4,
+        layout: {
+          'text-field':         ['coalesce', ['get', 'name_en'], ['get', 'name']],
+          'text-font':          ['Noto Sans Regular'],
+          'text-size':          ['interpolate', ['linear'], ['zoom'], 4, 9, 12, 13],
+          'text-anchor':        'top', 'text-offset': [0, 0.3],
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color':      'rgba(240,234,214,0.62)',
+          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-halo-width': 1,
+        } },
+    ],
+  };
 }
 
 // Pizza teardrop map pin — red body, Crust pizza SVG inside, amber badge for repeat visits
