@@ -2550,34 +2550,119 @@ async function initGlobe() {
     });
 
     const points = Object.values(placeMap);
-    container.innerHTML = '';  // MapLibre takes over the container
+    container.innerHTML = '';
 
     _globeInstance = new maplibregl.Map({
-      container:        'globe-container',
-      style:            crustMapStyle(),
-      center:           [0, 20],
-      zoom:             1.5,
-      minZoom:          0.5,
-      maxZoom:          18,
+      container:          'globe-container',
+      style:              crustMapStyle(),
+      center:             [0, 20],
+      zoom:               1.5,
+      minZoom:            0.5,
+      maxZoom:            18,
       attributionControl: false,
-      logoPosition:     'bottom-right',
     });
 
-    _globeInstance.on('load', () => {
-      // Globe projection — zooms into mercator at street level (MapLibre v3+)
+    _globeInstance.on('load', async () => {
+      // Globe projection — sphere at low zoom, transitions to flat at street level
       try { _globeInstance.setProjection({ type: 'globe' }); } catch (_) {}
 
-      // Add Crust pizza pin markers — mathematically anchored, never drift
-      points.forEach(p => {
-        new maplibregl.Marker({ element: buildGlobePin(p), anchor: 'bottom' })
-          .setLngLat([p.lng, p.lat])
-          .addTo(_globeInstance);
+      // Register pizza pin as a MapLibre image — symbol layers never drift
+      const pinImg = await createPinImage();
+      if (pinImg) _globeInstance.addImage('crust-pin', pinImg, { pixelRatio: window.devicePixelRatio || 2 });
+
+      // GeoJSON source with native clustering
+      _globeInstance.addSource('pizza-places', {
+        type:           'geojson',
+        data: {
+          type:     'FeatureCollection',
+          features: points.map(p => ({
+            type:     'Feature',
+            geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+            properties: {
+              placeId:    p.placeId,
+              name:       p.name,
+              city:       p.city,
+              country:    p.country,
+              visitCount: p.visitCount,
+              ratings:    JSON.stringify(p.ratings), // arrays must be stringified for GeoJSON props
+            }
+          }))
+        },
+        cluster:        true,
+        clusterMaxZoom: 11,   // above zoom 11 → show individual pins
+        clusterRadius:  50,   // px radius to merge into a cluster
+      });
+
+      // ── Cluster circle (terracotta, amber ring) ──────────────────
+      _globeInstance.addLayer({
+        id: 'clusters', type: 'circle',
+        source: 'pizza-places',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color':        '#D85A30',
+          'circle-radius':       ['step', ['get', 'point_count'], 18, 5, 22, 15, 26],
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#C8A97E',
+        }
+      });
+
+      // ── Cluster count label ──────────────────────────────────────
+      _globeInstance.addLayer({
+        id: 'cluster-count', type: 'symbol',
+        source: 'pizza-places',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field':         '{point_count_abbreviated}',
+          'text-font':          ['Noto Sans Regular'],
+          'text-size':          13,
+          'text-allow-overlap': true,
+        },
+        paint: { 'text-color': '#F0EAD6' }
+      });
+
+      // ── Individual pizza pins (unclustered) ─────────────────────
+      _globeInstance.addLayer({
+        id: 'unclustered-point', type: 'symbol',
+        source: 'pizza-places',
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+          'icon-image':            'crust-pin',
+          'icon-size':             1,
+          'icon-anchor':           'bottom',
+          'icon-allow-overlap':    true,
+          'icon-ignore-placement': true,
+        }
+      });
+
+      // ── Cluster tap → zoom in to expand ─────────────────────────
+      _globeInstance.on('click', 'clusters', e => {
+        e.originalEvent.stopPropagation();
+        const features = _globeInstance.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+        if (!features.length) return;
+        const clusterId = features[0].properties.cluster_id;
+        _globeInstance.getSource('pizza-places').getClusterExpansionZoom(clusterId, (err, zoom) => {
+          if (!err) _globeInstance.easeTo({ center: features[0].geometry.coordinates, zoom: zoom + 0.5, duration: 500 });
+        });
+      });
+
+      // ── Pin tap → info popup ────────────────────────────────────
+      _globeInstance.on('click', 'unclustered-point', e => {
+        e.originalEvent.stopPropagation();
+        const props   = e.features[0].properties;
+        const ratings = typeof props.ratings === 'string' ? JSON.parse(props.ratings) : (props.ratings || []);
+        showGlobePopup({ ...props, ratings });
+      });
+
+      // Cursor hints on desktop
+      ['clusters', 'unclustered-point'].forEach(layer => {
+        _globeInstance.on('mouseenter', layer, () => { _globeInstance.getCanvas().style.cursor = 'pointer'; });
+        _globeInstance.on('mouseleave', layer, () => { _globeInstance.getCanvas().style.cursor = ''; });
       });
 
       _globeLoaded = true;
     });
 
-    // Tap anywhere on map (not a pin) dismisses popup
+    // Map tap outside pins → dismiss popup
     _globeInstance.on('click', closeGlobePopup);
 
   } catch (e) {
@@ -2593,6 +2678,7 @@ async function initGlobe() {
 function crustMapStyle() {
   return {
     version: 8,
+    projection: { type: 'globe' },   // 3D sphere at low zoom levels
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
       ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }
@@ -2666,7 +2752,35 @@ function crustMapStyle() {
   };
 }
 
-// Pizza teardrop map pin — red body, Crust pizza SVG inside, amber badge for repeat visits
+// Creates the pizza pin as a MapLibre-compatible Image element
+// Logo is 20% smaller than original and precisely centered in the teardrop circle.
+// Scale: 0.3929 × 0.8 = 0.3143. Pizza center (40,50) @ scale → (12.57,15.71).
+// Translate to pin center (14,13): tx=1.43, ty=-2.71.
+function createPinImage() {
+  const svg = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 0C6.3 0 0 6.3 0 14C0 24.5 14 36 14 36C14 36 28 24.5 28 14C28 6.3 21.7 0 14 0Z" fill="#D85A30"/>
+    <g transform="translate(1.43 -2.71) scale(0.3143)">
+      <path d="M 40 50 L 63 34 A 28 28 0 1 0 63 66 Z" fill="#F0EAD6"/>
+      <path d="M 63 34 A 28 28 0 1 0 63 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <circle cx="26" cy="42" r="3"   fill="#C8A97E" opacity="0.7"/>
+      <circle cx="22" cy="55" r="2.4" fill="#C8A97E" opacity="0.7"/>
+      <circle cx="40" cy="35" r="2.4" fill="#C8A97E" opacity="0.7"/>
+      <circle cx="37" cy="63" r="2.4" fill="#C8A97E" opacity="0.7"/>
+      <path d="M 64 50 L 87 34 A 28 28 0 0 1 87 66 Z" fill="#F0EAD6"/>
+      <path d="M 87 34 A 28 28 0 0 1 87 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <circle cx="76" cy="44" r="2.2" fill="#C8A97E" opacity="0.7"/>
+      <circle cx="77" cy="57" r="2.2" fill="#C8A97E" opacity="0.7"/>
+    </g>
+  </svg>`;
+  return new Promise(resolve => {
+    const img   = new Image(28, 36);
+    img.onload  = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+
+// Pizza teardrop map pin — kept as HTML fallback, not used in primary flow
 function buildGlobePin(d) {
   const el = document.createElement('div');
   el.style.cssText = 'position:relative;display:inline-block;cursor:pointer;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.6));';
@@ -2718,7 +2832,16 @@ function showGlobePopup(d) {
       <div class="globe-popup-visits">${d.visitCount} ${d.visitCount === 1 ? 'visit' : 'visits'}</div>
     </div>
   `;
-  document.getElementById('globe-pin-popup').classList.remove('hidden');
+  const popup = document.getElementById('globe-pin-popup');
+  popup.classList.remove('hidden');
+
+  // Stop map-click propagation so popup doesn't instantly re-close
+  popup.onclick = e => e.stopPropagation();
+
+  // Swipe down to dismiss
+  let _ty0 = 0;
+  popup.ontouchstart = e => { _ty0 = e.touches[0].clientY; };
+  popup.ontouchend   = e => { if (e.changedTouches[0].clientY - _ty0 > 60) closeGlobePopup(); };
 }
 
 function closeGlobePopup() {
