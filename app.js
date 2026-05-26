@@ -2501,16 +2501,16 @@ function loadMapLibre() {
   return new Promise((resolve, reject) => {
     if (window.maplibregl) { resolve(); return; }
 
-    // Inject MapLibre CSS once
+    // CSS first
     if (!document.querySelector('link[href*="maplibre-gl"]')) {
       const link = document.createElement('link');
       link.rel   = 'stylesheet';
-      link.href  = 'https://unpkg.com/maplibre-gl@3/dist/maplibre-gl.css';
+      link.href  = 'https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css';
       document.head.appendChild(link);
     }
 
     const s  = document.createElement('script');
-    s.src    = 'https://unpkg.com/maplibre-gl@3/dist/maplibre-gl.js';
+    s.src    = 'https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js';
     s.onload = resolve;
     s.onerror = reject;
     document.head.appendChild(s);
@@ -2566,9 +2566,20 @@ async function initGlobe() {
       // Globe projection — sphere at low zoom, transitions to flat at street level
       try { _globeInstance.setProjection({ type: 'globe' }); } catch (_) {}
 
+      // Fog = what shows in "space" around the globe. Without this it tiles endlessly.
+      try {
+        _globeInstance.setFog({
+          color:            '#0d1a2e',   // atmosphere at surface
+          'high-color':     '#172338',   // upper atmosphere
+          'space-color':    '#141414',   // space = Crust background → globe floats on it
+          'horizon-blend':  0.08,        // sharpness of the horizon edge
+          'star-intensity': 0,
+        });
+      } catch (_) {}
+
       // Register pizza pin as a MapLibre image — symbol layers never drift
       const pinImg = await createPinImage();
-      if (pinImg) _globeInstance.addImage('crust-pin', pinImg, { pixelRatio: window.devicePixelRatio || 2 });
+      if (pinImg) _globeInstance.addImage('crust-pin', pinImg, { pixelRatio: 2 });
 
       // GeoJSON source with native clustering
       _globeInstance.addSource('pizza-places', {
@@ -2677,8 +2688,15 @@ async function initGlobe() {
 // Labels (country → state → city) built into tile data, appear at the right zoom
 function crustMapStyle() {
   return {
-    version: 8,
-    projection: { type: 'globe' },   // 3D sphere at low zoom levels
+    version:    8,
+    projection: { type: 'globe' },
+    fog: {
+      color:            '#0d1a2e',
+      'high-color':     '#172338',
+      'space-color':    '#141414',
+      'horizon-blend':  0.08,
+      'star-intensity': 0,
+    },
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
       ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }
@@ -2752,12 +2770,12 @@ function crustMapStyle() {
   };
 }
 
-// Creates the pizza pin as a MapLibre-compatible Image element
-// Logo is 20% smaller than original and precisely centered in the teardrop circle.
-// Scale: 0.3929 × 0.8 = 0.3143. Pizza center (40,50) @ scale → (12.57,15.71).
-// Translate to pin center (14,13): tx=1.43, ty=-2.71.
+// Creates the pizza pin as a MapLibre image.
+// Physical size 56×72px at pixelRatio:2 → renders at 28×36 CSS px (same as original HTML markers).
+// Logo is 20% smaller than original (scale 0.3143 vs 0.3929), precisely centered.
+// Pizza center (40,50)@scale0.3143 → (12.57,15.71) → translate(1.43,-2.71) centres at (14,13).
 function createPinImage() {
-  const svg = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+  const svg = `<svg width="56" height="72" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
     <path d="M14 0C6.3 0 0 6.3 0 14C0 24.5 14 36 14 36C14 36 28 24.5 28 14C28 6.3 21.7 0 14 0Z" fill="#D85A30"/>
     <g transform="translate(1.43 -2.71) scale(0.3143)">
       <path d="M 40 50 L 63 34 A 28 28 0 1 0 63 66 Z" fill="#F0EAD6"/>
@@ -2773,7 +2791,7 @@ function createPinImage() {
     </g>
   </svg>`;
   return new Promise(resolve => {
-    const img   = new Image(28, 36);
+    const img   = new Image(56, 72);   // 2× physical for retina
     img.onload  = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
