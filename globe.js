@@ -353,29 +353,14 @@ async function initGlobeGLView() {
       // Bump map: adds terrain relief so continents catch the amber atmosphere light
       .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
 
-      // ── Stacked bullseye pins ─────────────────────────────────
-      // Near-zero altitudes keep cylinders flat from any angle —
-      // no 3D hockey-puck effect even when zoomed in close
-      .pointsData([
-        ...points.map(p => ({ ...p, _pin: 'outer'  })),
-        ...points.map(p => ({ ...p, _pin: 'cream'  })),
-        ...points.map(p => ({ ...p, _pin: 'center' })),
-      ])
-      .pointLat('lat')
-      .pointLng('lng')
-      .pointColor(p =>
-        p._pin === 'outer' ? '#D85A30' :
-        p._pin === 'cream' ? '#F0EAD6' : '#FFFFFF'
-      )
-      .pointRadius(p => {
-        const base = Math.max(0.65, Math.min(1.9, 0.65 + (p.visitCount - 1) * 0.25));
-        return p._pin === 'outer' ? base : p._pin === 'cream' ? base * 0.60 : base * 0.23;
-      })
-      // Tiny altitude steps keep ordering without visible 3D depth
-      .pointAltitude(p =>
-        p._pin === 'outer' ? 0.001 : p._pin === 'cream' ? 0.002 : 0.003
-      )
-      .onPointClick(p => showGlobePopup(p))
+      // ── Crust HTML globe pins ─────────────────────────────────
+      // Fixed-screen-size HTML pins keep the original Crust glow style
+      // and avoid the oversized globe.gl cylinder / bullseye look when zoomed in.
+      .htmlElementsData(points)
+      .htmlLat('lat')
+      .htmlLng('lng')
+      .htmlAltitude(0.006)
+      .htmlElement(buildCrustGlobeMarker)
 
       // ── Glowing pulse rings ────────────────────────────────────
       // pow(1-t, 0.6) keeps ring more opaque longer = clear terracotta glow
@@ -383,8 +368,8 @@ async function initGlobeGLView() {
       .ringLat('lat')
       .ringLng('lng')
       .ringColor(() => t => `rgba(216,90,48,${Math.max(0, Math.pow(1 - t, 0.6))})`)
-      .ringMaxRadius(2.8)
-      .ringPropagationSpeed(1.2)
+      .ringMaxRadius(1.8)
+      .ringPropagationSpeed(0.8)
       .ringRepeatPeriod(1200)
       .ringAltitude(0.001)
 
@@ -517,6 +502,131 @@ function crustMapStyle() {
         } },
     ],
   };
+}
+
+
+// ── Globe HTML pin marker ─────────────────────────────────────
+// Matches the smaller glowing Crust pin style from the original globe build.
+// Kept self-contained here so no non-globe CSS has to be touched.
+function buildCrustGlobeMarker(d) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'crust-globe-pin';
+  el.setAttribute('aria-label', `${d.name || 'Pizza place'}${d.city ? ', ' + d.city : ''}`);
+
+  const countBadge = d.visitCount > 1
+    ? `<span class="crust-globe-pin-count">${d.visitCount}</span>`
+    : '';
+
+  el.innerHTML = `
+    <span class="crust-globe-pin-halo crust-globe-pin-halo--one"></span>
+    <span class="crust-globe-pin-halo crust-globe-pin-halo--two"></span>
+    <span class="crust-globe-pin-core">
+      <span class="crust-globe-pin-ring"></span>
+      <span class="crust-globe-pin-dot"></span>
+    </span>
+    ${countBadge}
+  `;
+
+  el.style.cssText = `
+    --pin-size:${d.visitCount > 1 ? '34px' : '30px'};
+    position:absolute;
+    width:var(--pin-size);
+    height:var(--pin-size);
+    margin-left:calc(var(--pin-size) / -2);
+    margin-top:calc(var(--pin-size) / -2);
+    padding:0;
+    border:0;
+    border-radius:50%;
+    background:transparent;
+    cursor:pointer;
+    transform:translateZ(0);
+    pointer-events:auto;
+    filter:drop-shadow(0 3px 10px rgba(0,0,0,.58));
+  `;
+
+  const style = document.createElement('style');
+  if (!document.getElementById('crust-globe-pin-styles')) {
+    style.id = 'crust-globe-pin-styles';
+    style.textContent = `
+      .crust-globe-pin * { box-sizing:border-box; pointer-events:none; }
+      .crust-globe-pin-halo {
+        position:absolute;
+        inset:-9px;
+        border-radius:50%;
+        border:1px solid rgba(216,90,48,.30);
+        background:radial-gradient(circle, rgba(216,90,48,.24) 0%, rgba(216,90,48,.13) 38%, rgba(216,90,48,0) 72%);
+        animation:crustGlobePinPulse 1.9s ease-out infinite;
+      }
+      .crust-globe-pin-halo--two {
+        inset:-16px;
+        opacity:.36;
+        animation-delay:.42s;
+      }
+      .crust-globe-pin-core {
+        position:absolute;
+        inset:0;
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background:#D85A30;
+        box-shadow:
+          0 0 0 2px rgba(200,169,126,.55),
+          0 0 15px rgba(216,90,48,.72),
+          0 0 28px rgba(216,90,48,.42);
+      }
+      .crust-globe-pin-ring {
+        position:absolute;
+        inset:7px;
+        border-radius:50%;
+        background:#F0EAD6;
+        box-shadow:inset 0 0 0 1px rgba(200,169,126,.62);
+      }
+      .crust-globe-pin-dot {
+        position:absolute;
+        width:8px;
+        height:8px;
+        border-radius:50%;
+        background:#fff;
+        box-shadow:0 0 10px rgba(255,255,255,.50);
+      }
+      .crust-globe-pin-count {
+        position:absolute;
+        top:-7px;
+        right:-7px;
+        min-width:18px;
+        height:18px;
+        padding:0 4px;
+        border-radius:999px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background:#C8A97E;
+        color:#141414;
+        border:1px solid rgba(20,20,20,.42);
+        font-family:'Outfit',sans-serif;
+        font-size:10px;
+        font-weight:700;
+        line-height:1;
+        box-shadow:0 2px 7px rgba(0,0,0,.46);
+      }
+      @keyframes crustGlobePinPulse {
+        0%   { transform:scale(.72); opacity:.70; }
+        70%  { transform:scale(1.34); opacity:.10; }
+        100% { transform:scale(1.48); opacity:0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  el.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    showGlobePopup(d);
+  });
+
+  return el;
 }
 
 // ── MapLibre pizza pin image ───────────────────────────────────
