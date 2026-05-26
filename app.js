@@ -2528,40 +2528,71 @@ function loadGlobeGL() {
 
     const existing = document.querySelector('script[data-crust-globe-gl]');
     if (existing) {
-      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('load', () => {
+        if (window.Globe) resolve();
+        else reject(new Error('globe.gl loaded, but window.Globe is missing'));
+      });
       existing.addEventListener('error', () => reject(new Error('Existing globe.gl script failed')));
       return;
     }
 
-    const script = document.createElement('script');
+    const urls = [
+      'https://cdn.jsdelivr.net/npm/globe.gl/dist/globe.gl.min.js',
+      'https://unpkg.com/globe.gl/dist/globe.gl.min.js',
+      'https://unpkg.com/globe.gl'
+    ];
 
-    // More reliable CDN than unpkg for mobile Safari
-    script.src = 'https://cdn.jsdelivr.net/npm/globe.gl/dist/globe.gl.min.js';
-    script.async = true;
-    script.dataset.crustGlobeGl = 'true';
+    let index = 0;
+    const errors = [];
 
-    const timeout = setTimeout(() => {
-      reject(new Error('globe.gl load timed out'));
-    }, 10000);
-
-    script.onload = () => {
-      clearTimeout(timeout);
+    const tryNext = () => {
       if (window.Globe) {
         resolve();
-      } else {
-        reject(new Error('globe.gl loaded but window.Globe is missing'));
+        return;
       }
+
+      if (index >= urls.length) {
+        reject(new Error(`globe.gl failed to load from all CDNs: ${errors.join(' | ')}`));
+        return;
+      }
+
+      const url = urls[index++];
+      const script = document.createElement('script');
+      script.src = url;
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.dataset.crustGlobeGl = 'true';
+
+      const timeout = setTimeout(() => {
+        script.remove();
+        errors.push(`${url} timed out`);
+        tryNext();
+      }, 12000);
+
+      script.onload = () => {
+        clearTimeout(timeout);
+        if (window.Globe) {
+          resolve();
+        } else {
+          script.remove();
+          errors.push(`${url} loaded, but window.Globe is missing`);
+          tryNext();
+        }
+      };
+
+      script.onerror = () => {
+        clearTimeout(timeout);
+        script.remove();
+        errors.push(`${url} script error`);
+        tryNext();
+      };
+
+      document.head.appendChild(script);
     };
 
-    script.onerror = () => {
-      clearTimeout(timeout);
-      reject(new Error('Could not load globe.gl script'));
-    };
-
-    document.head.appendChild(script);
+    tryNext();
   });
 }
-
 
 function globeDateKey(value) {
   if (!value) return '';
@@ -2615,7 +2646,7 @@ async function initGlobe() {
 
     container.innerHTML = '';
 
-    _globeInstance = Globe()(container)
+    _globeInstance = window.Globe()(container)
       .backgroundColor('#141414')
       .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-dark.jpg')
       .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
@@ -2677,7 +2708,7 @@ async function initGlobe() {
 
   } catch (e) {
     console.error('initGlobe:', e);
-    container.innerHTML = '<div class="globe-loading">Couldn’t load globe.</div>';
+    container.innerHTML = `<div class="globe-loading" style="padding:24px;text-align:center;line-height:1.5;">Couldn’t load globe.<br><span style="font-size:11px;opacity:.7;">${esc(e?.message || String(e))}</span></div>`;
   }
 }
 
