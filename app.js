@@ -2472,6 +2472,9 @@ function closeDestination() {
 
 let _globePoints = [];
 let _globeArcs = [];
+let _globeLabels = [];
+let _globeLabelMode = '';
+let _globeLabelTimer = null;
 let _globeResizeHandler = null;
 
 function updateGlobeTeaser(visits) {
@@ -2643,6 +2646,7 @@ async function initGlobe() {
 
     _globePoints = buildGlobePoints(visits);
     _globeArcs   = buildGlobeArcs(visits);
+    _globeLabels = buildGlobeLabels(_globePoints);
 
     container.innerHTML = '';
 
@@ -2653,6 +2657,17 @@ async function initGlobe() {
       .showAtmosphere(true)
       .atmosphereColor('#C8A97E')
       .atmosphereAltitude(0.13)
+
+      // Map labels. These are custom globe.gl labels, not MapLibre tiles.
+      .labelsData([])
+      .labelLat(d => d.lat)
+      .labelLng(d => d.lng)
+      .labelText(d => d.text)
+      .labelSize(d => d.size)
+      .labelColor(d => d.color)
+      .labelAltitude(d => d.altitude || 0.012)
+      .labelDotRadius(0)
+      .labelResolution(2)
 
       // Subtle travel arcs
       .arcsData([])
@@ -2682,9 +2697,14 @@ async function initGlobe() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
     controls.rotateSpeed = 0.45;
-    controls.zoomSpeed = 0.65;
-    controls.minDistance = 190;
-    controls.maxDistance = 520;
+    controls.zoomSpeed = 1.05;
+    controls.minDistance = 115;
+    controls.maxDistance = 650;
+    controls.enablePan = false;
+
+    if (controls.addEventListener) {
+      controls.addEventListener('change', scheduleGlobeLabelUpdate);
+    }
 
     // Start view: Caribbean / North America, matching your app context.
     _globeInstance.pointOfView(
@@ -2698,6 +2718,7 @@ async function initGlobe() {
 
     setTimeout(() => {
       animateGlobeIntro();
+      updateGlobeLabelVisibility(true);
     }, 500);
 
     if (!_globeResizeHandler) {
@@ -2758,6 +2779,107 @@ function buildGlobePoints(visits) {
 
   return Object.values(placeMap)
     .sort((a, b) => (a.firstDate || '').localeCompare(b.firstDate || ''));
+}
+
+
+function buildGlobeLabels(points) {
+  const labels = [];
+
+  // Broad labels keep the globe from feeling empty when zoomed out.
+  labels.push(
+    { type: 'continent', text: 'NORTH\nAMERICA', lat: 47, lng: -103, size: 1.35, altitude: 0.016, color: 'rgba(240,234,214,0.58)' },
+    { type: 'continent', text: 'SOUTH\nAMERICA', lat: -17, lng: -60, size: 1.35, altitude: 0.016, color: 'rgba(240,234,214,0.52)' },
+    { type: 'continent', text: 'EUROPE', lat: 51, lng: 12, size: 1.18, altitude: 0.016, color: 'rgba(240,234,214,0.54)' },
+    { type: 'continent', text: 'AFRICA', lat: 3, lng: 20, size: 1.18, altitude: 0.016, color: 'rgba(240,234,214,0.50)' },
+    { type: 'continent', text: 'ASIA', lat: 36, lng: 88, size: 1.18, altitude: 0.016, color: 'rgba(240,234,214,0.50)' },
+    { type: 'continent', text: 'AUSTRALIA', lat: -25, lng: 135, size: 1.02, altitude: 0.016, color: 'rgba(240,234,214,0.48)' }
+  );
+
+  const knownCountries = [
+    ['UNITED STATES', 39, -98], ['CANADA', 57, -106], ['MEXICO', 23, -102],
+    ['PUERTO RICO', 18.2, -66.5], ['DOMINICAN REPUBLIC', 19, -70.5],
+    ['COLOMBIA', 4.6, -74], ['BRAZIL', -10, -52], ['ARGENTINA', -34, -64],
+    ['UNITED KINGDOM', 54, -2], ['FRANCE', 46.2, 2.2], ['SPAIN', 40.4, -3.7],
+    ['ITALY', 42.8, 12.5], ['NETHERLANDS', 52.2, 5.3]
+  ];
+
+  knownCountries.forEach(([text, lat, lng]) => {
+    labels.push({ type: 'country', text, lat, lng, size: 0.78, altitude: 0.018, color: 'rgba(240,234,214,0.48)' });
+  });
+
+  // Add labels for user's own visited cities/countries so zoomed-in views feel personal.
+  const cityMap = new Map();
+  const countryMap = new Map();
+
+  points.forEach(p => {
+    const lat = Number(p.lat);
+    const lng = Number(p.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+
+    const cityKey = [p.city || '', p.country || ''].filter(Boolean).join(', ');
+    if (cityKey && !cityMap.has(cityKey)) {
+      cityMap.set(cityKey, { text: cityKey, lat, lng });
+    }
+
+    if (p.country && !countryMap.has(p.country)) {
+      countryMap.set(p.country, { text: p.country.toUpperCase(), lat, lng });
+    }
+  });
+
+  countryMap.forEach(v => {
+    labels.push({ type: 'country', text: v.text, lat: v.lat, lng: v.lng, size: 0.72, altitude: 0.019, color: 'rgba(200,169,126,0.55)' });
+  });
+
+  cityMap.forEach(v => {
+    labels.push({ type: 'city', text: v.text, lat: v.lat, lng: v.lng, size: 0.52, altitude: 0.022, color: 'rgba(240,234,214,0.72)' });
+  });
+
+  return labels;
+}
+
+function scheduleGlobeLabelUpdate() {
+  if (_globeLabelTimer) return;
+  _globeLabelTimer = setTimeout(() => {
+    _globeLabelTimer = null;
+    updateGlobeLabelVisibility(false);
+  }, 120);
+}
+
+function currentGlobeCameraDistance() {
+  if (!_globeInstance || !_globeInstance.camera) return 999;
+  const cam = _globeInstance.camera();
+  if (!cam || !cam.position) return 999;
+  return cam.position.length();
+}
+
+function updateGlobeLabelVisibility(force = false) {
+  if (!_globeInstance || !_globeLabels.length) return;
+
+  const dist = currentGlobeCameraDistance();
+  let mode = 'continent';
+
+  if (dist < 175) mode = 'city';
+  else if (dist < 300) mode = 'country';
+
+  if (!force && mode === _globeLabelMode) return;
+  _globeLabelMode = mode;
+
+  let visible = [];
+  if (mode === 'continent') {
+    visible = _globeLabels.filter(l => l.type === 'continent');
+  } else if (mode === 'country') {
+    visible = _globeLabels.filter(l => l.type === 'continent' || l.type === 'country');
+  } else {
+    visible = _globeLabels.filter(l => l.type === 'country' || l.type === 'city');
+  }
+
+  _globeInstance.labelsData(visible.slice(0, 90));
+}
+
+function openGlobePlace(placeId) {
+  closeGlobePopup();
+  closeGlobe();
+  if (placeId) setTimeout(() => openPlace(placeId), 260);
 }
 
 function buildGlobeArcs(visits) {
@@ -2822,7 +2944,10 @@ function buildGlobePinElement(d) {
   el.addEventListener('click', e => {
     e.stopPropagation();
     flyToGlobePoint(d);
-    showGlobePopup(d);
+
+    // Match the old behavior: tapping a pin opens the actual place card.
+    // Small delay lets the globe start flying toward the pin first.
+    setTimeout(() => openGlobePlace(d.placeId), 420);
   });
 
   return el;
@@ -2858,6 +2983,10 @@ function animateGlobeIntro() {
   setTimeout(() => {
     _globeInstance.arcsData(_globeArcs);
   }, 850);
+
+  setTimeout(() => {
+    updateGlobeLabelVisibility(true);
+  }, 950);
 
   const target = pickBestGlobeStartingPoint();
 

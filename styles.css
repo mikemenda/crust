@@ -2232,3 +2232,18 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   70%  { transform: scale(1.12); }
   100% { transform: scale(1); }
 }
+
+
+/* ── GLOBE LABELS / ZOOM EXPERIENCE ─────────────────────────── */
+.scene-label, .globe-label, [class*="label"] {
+  font-family: var(--font) !important;
+}
+
+.crust-globe-pin {
+  touch-action: manipulation;
+}
+
+.crust-globe-pin:active .crust-globe-pin-core {
+  transform: scale(0.86);
+  filter: brightness(1.08);
+}
