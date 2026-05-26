@@ -23,7 +23,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="globe.css">
   <style>
     /* ── City/country editable row ─────────────────────────── */
     .place-location-row {
@@ -795,58 +794,30 @@
     <div class="ifeed-scroll" id="ifeed-scroll"></div>
   </div>
 
-  <!-- ─── WORLD MAP / GLOBE OVERLAY ────────────────────── -->
-  <div id="world-overlay" class="world-overlay hidden" aria-hidden="true">
-    <div class="world-topbar">
-      <button class="btn-icon" onclick="closeGlobe()" aria-label="Close world map">
+  <!-- ─── GLOBE OVERLAY ────────────────────────────────────── -->
+  <div id="globe-overlay" class="globe-overlay hidden">
+    <div class="globe-topbar">
+      <button class="btn-icon" onclick="closeGlobe()" aria-label="Close">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
       </button>
-      <div class="world-title-wrap">
-        <div class="world-title">World Map</div>
-        <div id="world-subtitle" class="world-subtitle">Pizza passport</div>
-      </div>
-      <button class="btn-icon" onclick="resetWorldView()" aria-label="Reset world map view">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 12a9 9 0 1 0 3-6.7"/>
-          <path d="M3 4v6h6"/>
-        </svg>
-      </button>
+      <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--amber);">World Map</span>
+      <div style="width:32px;"></div>
     </div>
+    <div id="globe-container" class="globe-container"></div>
 
-    <div class="world-mode-toggle" role="tablist" aria-label="World map mode">
-      <button id="world-mode-map" class="world-mode-btn active" onclick="switchWorldMode('map')" type="button">Map View</button>
-      <button id="world-mode-globe" class="world-mode-btn" onclick="switchWorldMode('globe')" type="button">Globe View</button>
-    </div>
-
-    <div class="world-stage">
-      <div id="world-map-container" class="world-view world-map-view active"></div>
-      <div id="world-globe-container" class="world-view world-globe-view"></div>
-      <div id="world-empty-state" class="world-empty-state hidden">
-        <div class="world-empty-icon">🍕</div>
-        <div class="world-empty-title">No mapped pizzas yet</div>
-        <div class="world-empty-body">Log pizzas with a place selected to see them here.</div>
+    <!-- ─ Pin info popup — slides up on pin tap ─ -->
+    <div id="globe-pin-popup" class="globe-pin-popup hidden">
+      <div class="globe-pin-popup-topbar">
+        <button class="btn-icon" onclick="closeGlobePopup()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <button class="btn-detail-edit" onclick="viewGlobePlace()">View Place →</button>
       </div>
-    </div>
-
-    <div id="world-place-sheet" class="world-place-sheet hidden">
-      <div class="world-sheet-handle"></div>
-      <div class="world-place-toprow">
-        <div>
-          <div id="world-place-name" class="world-place-name">Place</div>
-          <div id="world-place-location" class="world-place-location"></div>
-        </div>
-        <button class="world-sheet-close" onclick="closeWorldPlaceSheet()" aria-label="Close place card">×</button>
-      </div>
-      <div class="world-place-meta">
-        <div>
-          <span id="world-place-rating" class="world-place-rating">—</span>
-          <span class="world-place-rating-denom">/ 10</span>
-        </div>
-        <div id="world-place-visits" class="world-place-visits">0 visits</div>
-      </div>
-      <button id="world-place-view-btn" class="world-place-view-btn" onclick="viewGlobePlace()" type="button">View Place →</button>
+      <div id="globe-pin-popup-body" class="globe-pin-popup-body"></div>
     </div>
   </div>
 
@@ -887,7 +858,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
 
 <script src="firebase-config.js"></script>
-<script src="globe.js"></script>
 <script src="app.js"></script>
 
 </body>

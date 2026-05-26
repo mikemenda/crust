@@ -2467,4 +2467,446 @@ function closeDestination() {
 }
 
 // ── WORLD MAP / GLOBE ─────────────────────────────────────────
-// Moved to globe.js so the World Map feature stays isolated from the main app logic.
+
+function updateGlobeTeaser(visits) {
+  const pinsEl = document.getElementById('globe-teaser-pins');
+  const geoEl  = document.getElementById('globe-teaser-geo');
+  if (!pinsEl || !geoEl) return;
+  const mapped       = visits.filter(v => v.lat != null && v.lng != null);
+  const uniquePlaces = new Set(mapped.map(v => v.placeId).filter(Boolean));
+  const countries    = new Set(mapped.map(v => v.country).filter(Boolean));
+  const cities       = new Set(mapped.map(v => v.city).filter(Boolean));
+  pinsEl.textContent = uniquePlaces.size || mapped.length || 0;
+  const parts = [];
+  if (countries.size) parts.push(`${countries.size} ${countries.size === 1 ? 'country' : 'countries'}`);
+  if (cities.size)    parts.push(`${cities.size} ${cities.size === 1 ? 'city' : 'cities'}`);
+  geoEl.textContent = parts.join(' · ');
+}
+
+function openGlobe() {
+  document.getElementById('globe-overlay').classList.remove('hidden');
+  if (!_globeLoaded) {
+    requestAnimationFrame(() => initGlobe());
+  } else if (_globeInstance) {
+    requestAnimationFrame(() => {
+      _globeInstance.resize();
+      syncGlobeMode();
+    });
+  }
+}
+
+// Toggles between sphere view (zoom ≤ 3.5) and full-screen map (zoom > 3.5).
+// Clips the map canvas to a circle with dark "space" visible in the corners.
+function syncGlobeMode() {
+  if (!_globeInstance) return;
+  const zoom      = _globeInstance.getZoom();
+  const container = document.getElementById('globe-container');
+  const overlay   = document.getElementById('globe-overlay');
+  if (!container || !overlay) return;
+
+  const isGlobe  = zoom <= 3.5;
+  const wasGlobe = container.classList.contains('globe-sphere-mode');
+
+  if (isGlobe) {
+    // Square canvas — size = min(available width, available height minus topbar)
+    const availW = overlay.offsetWidth;
+    const availH = overlay.offsetHeight - 60;  // ~60px topbar
+    const size   = Math.min(availW, availH) - 24; // 12px breathing room each side
+    container.style.width  = size + 'px';
+    container.style.height = size + 'px';
+    container.classList.add('globe-sphere-mode');
+  } else {
+    container.style.width  = '';
+    container.style.height = '';
+    container.classList.remove('globe-sphere-mode');
+  }
+
+  if (wasGlobe !== isGlobe) _globeInstance.resize();
+}
+
+function closeGlobe() {
+  closeGlobePopup();
+  document.getElementById('globe-overlay').classList.add('hidden');
+}
+
+function loadMapLibre() {
+  return new Promise((resolve, reject) => {
+    if (window.maplibregl) { resolve(); return; }
+
+    // CSS first
+    if (!document.querySelector('link[href*="maplibre-gl"]')) {
+      const link = document.createElement('link');
+      link.rel   = 'stylesheet';
+      link.href  = 'https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css';
+      document.head.appendChild(link);
+    }
+
+    const s  = document.createElement('script');
+    s.src    = 'https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function initGlobe() {
+  const container = document.getElementById('globe-container');
+  if (!container || !currentUser) return;
+  container.innerHTML = '<div class="globe-loading">Loading map…</div>';
+
+  try {
+    await loadMapLibre();
+
+    const snap   = await db.collection(`users/${currentUser.uid}/visits`).get();
+    const visits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Deduplicate by placeId — only entries with coordinates
+    const placeMap = {};
+    visits.forEach(v => {
+      if (!v.placeId || v.lat == null || v.lng == null) return;
+      const pid = v.placeId;
+      if (!placeMap[pid]) {
+        placeMap[pid] = {
+          placeId:    pid,
+          name:       v.placeName || 'Unknown',
+          city:       v.city    || '',
+          country:    v.country || '',
+          lat:        v.lat,
+          lng:        v.lng,
+          visitCount: 0,
+          ratings:    [],
+        };
+      }
+      placeMap[pid].visitCount++;
+      if (v.rating != null) placeMap[pid].ratings.push(v.rating);
+    });
+
+    const points = Object.values(placeMap);
+    container.innerHTML = '';
+
+    _globeInstance = new maplibregl.Map({
+      container:          'globe-container',
+      style:              crustMapStyle(),
+      center:             [-70, 18],    // Caribbean — Puerto Rico / North America
+      zoom:               2,
+      minZoom:            0.5,
+      maxZoom:            18,
+      attributionControl: false,
+    });
+
+    _globeInstance.on('load', async () => {
+      // Globe projection — sphere at low zoom, transitions to flat at street level
+      try { _globeInstance.setProjection({ type: 'globe' }); } catch (_) {}
+
+      // Fog = what shows in "space" around the globe. Without this it tiles endlessly.
+      try {
+        _globeInstance.setFog({
+          color:            '#0d1a2e',   // atmosphere at surface
+          'high-color':     '#172338',   // upper atmosphere
+          'space-color':    '#141414',   // space = Crust background → globe floats on it
+          'horizon-blend':  0.08,        // sharpness of the horizon edge
+          'star-intensity': 0,
+        });
+      } catch (_) {}
+
+      // Register pizza pin as a MapLibre image — symbol layers never drift
+      const pinImg = await createPinImage();
+      if (pinImg) _globeInstance.addImage('crust-pin', pinImg, { pixelRatio: 2 });
+
+      // GeoJSON source with native clustering
+      _globeInstance.addSource('pizza-places', {
+        type:           'geojson',
+        data: {
+          type:     'FeatureCollection',
+          features: points.map(p => ({
+            type:     'Feature',
+            geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+            properties: {
+              placeId:    p.placeId,
+              name:       p.name,
+              city:       p.city,
+              country:    p.country,
+              visitCount: p.visitCount,
+              ratings:    JSON.stringify(p.ratings), // arrays must be stringified for GeoJSON props
+            }
+          }))
+        },
+        cluster:        true,
+        clusterMaxZoom: 11,   // above zoom 11 → show individual pins
+        clusterRadius:  50,   // px radius to merge into a cluster
+      });
+
+      // ── Cluster circle (terracotta, amber ring) ──────────────────
+      _globeInstance.addLayer({
+        id: 'clusters', type: 'circle',
+        source: 'pizza-places',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color':        '#D85A30',
+          'circle-radius':       ['step', ['get', 'point_count'], 18, 5, 22, 15, 26],
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#C8A97E',
+        }
+      });
+
+      // ── Cluster count label ──────────────────────────────────────
+      _globeInstance.addLayer({
+        id: 'cluster-count', type: 'symbol',
+        source: 'pizza-places',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field':         '{point_count_abbreviated}',
+          'text-font':          ['Noto Sans Regular'],
+          'text-size':          13,
+          'text-allow-overlap': true,
+        },
+        paint: { 'text-color': '#F0EAD6' }
+      });
+
+      // ── Individual pizza pins (unclustered) ─────────────────────
+      _globeInstance.addLayer({
+        id: 'unclustered-point', type: 'symbol',
+        source: 'pizza-places',
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+          'icon-image':            'crust-pin',
+          'icon-size':             1,
+          'icon-anchor':           'bottom',
+          'icon-allow-overlap':    true,
+          'icon-ignore-placement': true,
+        }
+      });
+
+      // ── Cluster tap → zoom in to expand ─────────────────────────
+      _globeInstance.on('click', 'clusters', e => {
+        e.originalEvent.stopPropagation();
+        const features = _globeInstance.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+        if (!features.length) return;
+        const clusterId = features[0].properties.cluster_id;
+        _globeInstance.getSource('pizza-places').getClusterExpansionZoom(clusterId, (err, zoom) => {
+          if (!err) _globeInstance.easeTo({ center: features[0].geometry.coordinates, zoom: zoom + 0.5, duration: 500 });
+        });
+      });
+
+      // ── Pin tap → info popup ────────────────────────────────────
+      _globeInstance.on('click', 'unclustered-point', e => {
+        e.originalEvent.stopPropagation();
+        const props   = e.features[0].properties;
+        const ratings = typeof props.ratings === 'string' ? JSON.parse(props.ratings) : (props.ratings || []);
+        showGlobePopup({ ...props, ratings });
+      });
+
+      // Cursor hints on desktop
+      ['clusters', 'unclustered-point'].forEach(layer => {
+        _globeInstance.on('mouseenter', layer, () => { _globeInstance.getCanvas().style.cursor = 'pointer'; });
+        _globeInstance.on('mouseleave', layer, () => { _globeInstance.getCanvas().style.cursor = ''; });
+      });
+
+      _globeLoaded = true;
+
+      // Apply sphere clip on open; re-sync whenever user zooms
+      syncGlobeMode();
+      _globeInstance.on('zoomend', syncGlobeMode);
+    });
+
+    // Map tap outside pins → dismiss popup
+    _globeInstance.on('click', closeGlobePopup);
+
+  } catch (e) {
+    console.error('initGlobe:', e);
+    const c = document.getElementById('globe-container');
+    if (c) c.innerHTML = '<div class="globe-loading">Couldn\'t load map.</div>';
+  }
+}
+
+// Crust dark map style — OpenFreeMap vector tiles (free, no API key)
+// Vector tiles = infinitely sharp at every zoom level
+// Labels (country → state → city) built into tile data, appear at the right zoom
+function crustMapStyle() {
+  return {
+    version:    8,
+    projection: { type: 'globe' },
+    fog: {
+      color:            '#0d1a2e',
+      'high-color':     '#172338',
+      'space-color':    '#141414',
+      'horizon-blend':  0.08,
+      'star-intensity': 0,
+    },
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sources: {
+      ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }
+    },
+    layers: [
+      // Base: land = dark navy, water = darker navy
+      { id: 'bg',    type: 'background', paint: { 'background-color': '#172338' } },
+      { id: 'water', type: 'fill', source: 'ofm', 'source-layer': 'water',
+        paint: { 'fill-color': '#0A1628' } },
+      // Country borders
+      { id: 'border-country', type: 'line', source: 'ofm', 'source-layer': 'boundary',
+        filter: ['all', ['==', 'admin_level', 2], ['!=', 'maritime', 1]],
+        paint: {
+          'line-color': 'rgba(200,169,126,0.30)',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.4, 6, 1.4],
+        } },
+      // State / province borders (zoom 3+)
+      { id: 'border-state', type: 'line', source: 'ofm', 'source-layer': 'boundary',
+        filter: ['==', 'admin_level', 4], minzoom: 3,
+        paint: {
+          'line-color': 'rgba(200,169,126,0.15)',
+          'line-width': 0.5, 'line-dasharray': [2, 3],
+        } },
+      // Country labels — always visible, uppercase, spaced
+      { id: 'label-country', type: 'symbol', source: 'ofm', 'source-layer': 'place',
+        filter: ['==', ['get', 'class'], 'country'],
+        layout: {
+          'text-field':          ['coalesce', ['get', 'name_en'], ['get', 'name']],
+          'text-font':           ['Noto Sans Regular'],
+          'text-size':           ['interpolate', ['linear'], ['zoom'], 1, 9, 5, 13],
+          'text-transform':      'uppercase',
+          'text-letter-spacing': 0.12,
+          'text-allow-overlap':  false,
+        },
+        paint: {
+          'text-color':      'rgba(240,234,214,0.75)',
+          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-halo-width': 1.5,
+        } },
+      // State / region labels (zoom 3+)
+      { id: 'label-state', type: 'symbol', source: 'ofm', 'source-layer': 'place',
+        filter: ['match', ['get', 'class'], ['state'], true, false],
+        minzoom: 3,
+        layout: {
+          'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']],
+          'text-font':  ['Noto Sans Regular'], 'text-size': 10,
+          'text-letter-spacing': 0.06, 'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color':      'rgba(240,234,214,0.52)',
+          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-halo-width': 1,
+        } },
+      // City / town labels (zoom 4+)
+      { id: 'label-city', type: 'symbol', source: 'ofm', 'source-layer': 'place',
+        filter: ['match', ['get', 'class'], ['city', 'town'], true, false],
+        minzoom: 4,
+        layout: {
+          'text-field':         ['coalesce', ['get', 'name_en'], ['get', 'name']],
+          'text-font':          ['Noto Sans Regular'],
+          'text-size':          ['interpolate', ['linear'], ['zoom'], 4, 9, 12, 13],
+          'text-anchor':        'top', 'text-offset': [0, 0.3],
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color':      'rgba(240,234,214,0.62)',
+          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-halo-width': 1,
+        } },
+    ],
+  };
+}
+
+// Creates the pizza pin as a MapLibre image.
+// Physical size 56×72px at pixelRatio:2 → renders at 28×36 CSS px (same as original HTML markers).
+// Logo is 20% smaller than original (scale 0.3143 vs 0.3929), precisely centered.
+// Pizza center (40,50)@scale0.3143 → (12.57,15.71) → translate(1.43,-2.71) centres at (14,13).
+function createPinImage() {
+  const svg = `<svg width="56" height="72" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 0C6.3 0 0 6.3 0 14C0 24.5 14 36 14 36C14 36 28 24.5 28 14C28 6.3 21.7 0 14 0Z" fill="#D85A30"/>
+    <g transform="translate(1.43 -2.71) scale(0.3143)">
+      <path d="M 40 50 L 63 34 A 28 28 0 1 0 63 66 Z" fill="#F0EAD6"/>
+      <path d="M 63 34 A 28 28 0 1 0 63 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <circle cx="26" cy="42" r="3"   fill="#C8A97E" opacity="0.7"/>
+      <circle cx="22" cy="55" r="2.4" fill="#C8A97E" opacity="0.7"/>
+      <circle cx="40" cy="35" r="2.4" fill="#C8A97E" opacity="0.7"/>
+      <circle cx="37" cy="63" r="2.4" fill="#C8A97E" opacity="0.7"/>
+      <path d="M 64 50 L 87 34 A 28 28 0 0 1 87 66 Z" fill="#F0EAD6"/>
+      <path d="M 87 34 A 28 28 0 0 1 87 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <circle cx="76" cy="44" r="2.2" fill="#C8A97E" opacity="0.7"/>
+      <circle cx="77" cy="57" r="2.2" fill="#C8A97E" opacity="0.7"/>
+    </g>
+  </svg>`;
+  return new Promise(resolve => {
+    const img   = new Image(56, 72);   // 2× physical for retina
+    img.onload  = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+
+// Pizza teardrop map pin — kept as HTML fallback, not used in primary flow
+function buildGlobePin(d) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:relative;display:inline-block;cursor:pointer;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.6));';
+
+  // Teardrop pin with Crust pizza logo inside.
+  // Pizza paths from brand spec scaled to fit in the 28px-wide pin circle.
+  // Original pizza center ≈ (40,50) in 100×100 space; scale 0.3929 → fits in r=11px circle.
+  // translate(-1.71,-6.64) centres the scaled pizza at pin centre (14,13).
+  el.innerHTML = `
+    <svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 0C6.3 0 0 6.3 0 14C0 24.5 14 36 14 36C14 36 28 24.5 28 14C28 6.3 21.7 0 14 0Z" fill="#D85A30"/>
+      <g transform="translate(-1.71 -6.64) scale(0.3929)">
+        <path d="M 40 50 L 63 34 A 28 28 0 1 0 63 66 Z" fill="#F0EAD6"/>
+        <path d="M 63 34 A 28 28 0 1 0 63 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        <circle cx="26" cy="42" r="3"   fill="#C8A97E" opacity="0.7"/>
+        <circle cx="22" cy="55" r="2.4" fill="#C8A97E" opacity="0.7"/>
+        <circle cx="40" cy="35" r="2.4" fill="#C8A97E" opacity="0.7"/>
+        <circle cx="37" cy="63" r="2.4" fill="#C8A97E" opacity="0.7"/>
+        <path d="M 64 50 L 87 34 A 28 28 0 0 1 87 66 Z" fill="#F0EAD6"/>
+        <path d="M 87 34 A 28 28 0 0 1 87 66" stroke="#C8A97E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        <circle cx="76" cy="44" r="2.2" fill="#C8A97E" opacity="0.7"/>
+        <circle cx="77" cy="57" r="2.2" fill="#C8A97E" opacity="0.7"/>
+      </g>
+    </svg>
+    ${d.visitCount > 1 ? `<div style="position:absolute;top:-4px;right:-5px;background:#C8A97E;color:#141414;border-radius:50%;width:14px;height:14px;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;line-height:1;border:1px solid rgba(20,20,20,0.3);">${d.visitCount}</div>` : ''}
+  `;
+
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    showGlobePopup(d);
+  });
+  return el;
+}
+
+// ── GLOBE PIN POPUP ───────────────────────────────────────────
+
+let _currentGlobePinPlace = null;
+
+function showGlobePopup(d) {
+  _currentGlobePinPlace = d.placeId;
+  const avg = d.ratings.length
+    ? (d.ratings.reduce((s, r) => s + r, 0) / d.ratings.length).toFixed(1)
+    : null;
+  document.getElementById('globe-pin-popup-body').innerHTML = `
+    <div class="globe-popup-name">${esc(d.name)}</div>
+    <div class="globe-popup-loc">${[d.city, d.country].filter(Boolean).map(s => esc(s)).join(' · ')}</div>
+    <div class="globe-popup-meta">
+      ${avg ? `<div class="globe-popup-rating">${avg}<span> / 10</span></div>` : ''}
+      <div class="globe-popup-visits">${d.visitCount} ${d.visitCount === 1 ? 'visit' : 'visits'}</div>
+    </div>
+  `;
+  const popup = document.getElementById('globe-pin-popup');
+  popup.classList.remove('hidden');
+
+  // Stop map-click propagation so popup doesn't instantly re-close
+  popup.onclick = e => e.stopPropagation();
+
+  // Swipe down to dismiss
+  let _ty0 = 0;
+  popup.ontouchstart = e => { _ty0 = e.touches[0].clientY; };
+  popup.ontouchend   = e => { if (e.changedTouches[0].clientY - _ty0 > 60) closeGlobePopup(); };
+}
+
+function closeGlobePopup() {
+  const el = document.getElementById('globe-pin-popup');
+  if (el) el.classList.add('hidden');
+  _currentGlobePinPlace = null;
+}
+
+function viewGlobePlace() {
+  const pid = _currentGlobePinPlace;
+  closeGlobePopup();
+  closeGlobe();
+  if (pid) setTimeout(() => openPlace(pid), 320);
+}
