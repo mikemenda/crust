@@ -353,9 +353,9 @@ async function initGlobeGLView() {
       // Bump map: adds terrain relief so continents catch the amber atmosphere light
       .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
 
-      // ── Stacked bullseye pins: 3 layers at increasing altitudes ─
-      // Viewed from above they render as concentric circles:
-      // terracotta outer disc → cream ring → white center dot
+      // ── Stacked bullseye pins ─────────────────────────────────
+      // Near-zero altitudes keep cylinders flat from any angle —
+      // no 3D hockey-puck effect even when zoomed in close
       .pointsData([
         ...points.map(p => ({ ...p, _pin: 'outer'  })),
         ...points.map(p => ({ ...p, _pin: 'cream'  })),
@@ -368,24 +368,25 @@ async function initGlobeGLView() {
         p._pin === 'cream' ? '#F0EAD6' : '#FFFFFF'
       )
       .pointRadius(p => {
-        const base = Math.max(0.80, Math.min(2.2, 0.80 + (p.visitCount - 1) * 0.28));
-        return p._pin === 'outer' ? base : p._pin === 'cream' ? base * 0.60 : base * 0.22;
+        const base = Math.max(0.65, Math.min(1.9, 0.65 + (p.visitCount - 1) * 0.25));
+        return p._pin === 'outer' ? base : p._pin === 'cream' ? base * 0.60 : base * 0.23;
       })
+      // Tiny altitude steps keep ordering without visible 3D depth
       .pointAltitude(p =>
-        p._pin === 'outer' ? 0.015 : p._pin === 'cream' ? 0.026 : 0.040
+        p._pin === 'outer' ? 0.001 : p._pin === 'cream' ? 0.002 : 0.003
       )
       .onPointClick(p => showGlobePopup(p))
 
-      // ── Glowing animated rings (the beacon effect) ─────────────
-      // ringColor gets d (data obj) → returns a fn t→color where t∈[0,1] is ring progress
+      // ── Glowing pulse rings ────────────────────────────────────
+      // pow(1-t, 0.6) keeps ring more opaque longer = clear terracotta glow
       .ringsData(points)
       .ringLat('lat')
       .ringLng('lng')
-      .ringColor(() => t => `rgba(216,90,48,${Math.max(0, 1 - t)})`)
-      .ringMaxRadius(3.5)
-      .ringPropagationSpeed(1.0)
-      .ringRepeatPeriod(1400)
-      .ringAltitude(0.02)
+      .ringColor(() => t => `rgba(216,90,48,${Math.max(0, Math.pow(1 - t, 0.6))})`)
+      .ringMaxRadius(2.8)
+      .ringPropagationSpeed(1.2)
+      .ringRepeatPeriod(1200)
+      .ringAltitude(0.001)
 
       // ── Animated arcs from home → destinations ─────────────────
       .arcsData(arcs)
