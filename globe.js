@@ -12,7 +12,12 @@ let _mapLoaded       = false;  // true once MapLibre has fully initialised
 let _globeGLInstance = null;   // globe.gl instance
 let _globeGLLoaded   = false;  // true once globe.gl has fully initialised
 let _visitPoints     = null;   // shared deduped point array — fetched once, reused by both views
-let _activeView      = 'map';  // 'map' | 'globe'
+let _activeView      = 'globe';  // 'map' | 'globe'
+let _isViewTransitioning = false; // prevents auto-switch loops during fade/zoom transitions
+let _lastMapCenter    = { lat: 18, lng: -66 };
+let _lastMapZoom      = 2;
+let _globeHomePoint   = { lat: 18, lng: -66 };
+let _globeAutoSwitchTimer = null;
 
 let _currentGlobePinPlace = null;
 
@@ -51,21 +56,21 @@ function updateGlobeTeaser(visits) {
 // ── Open / Close ───────────────────────────────────────────────
 function openGlobe() {
   document.getElementById('globe-overlay').classList.remove('hidden');
-  if (_activeView === 'map') {
-    if (!_mapLoaded) {
-      requestAnimationFrame(() => initMapView());
-    } else if (_mapInstance) {
-      requestAnimationFrame(() => _mapInstance.resize());
-    }
+  ensureWorldViewTransitionStyles();
+
+  // World Map now opens on the premium 3D globe by default.
+  // The flat map still exists under the hood for zoomed/detail exploration.
+  if (!_globeGLLoaded) {
+    _activeView = 'globe';
+    syncWorldViewToggle('globe');
+    showWorldViewContainer('globe');
+    requestAnimationFrame(() => initGlobeGLView());
   } else {
-    if (!_globeGLLoaded) {
-      requestAnimationFrame(() => initGlobeGLView());
-    } else if (_globeGLInstance) {
-      _globeGLInstance.controls().autoRotate = true;
-    }
+    showWorldViewContainer('globe');
+    syncWorldViewToggle('globe');
+    if (_globeGLInstance) _globeGLInstance.controls().autoRotate = true;
   }
 }
-
 function closeGlobe() {
   closeGlobePopup();
   document.getElementById('globe-overlay').classList.add('hidden');
@@ -74,42 +79,194 @@ function closeGlobe() {
 }
 
 // ── View toggle ────────────────────────────────────────────────
-function switchGlobeView(view) {
-  if (_activeView === view) return;
-  _activeView = view;
-
-  // Update toggle UI
+function syncWorldViewToggle(view) {
   const track      = document.getElementById('gvt-track');
   const mapLabel   = document.getElementById('gvt-map-label');
   const globeLabel = document.getElementById('gvt-globe-label');
   if (track)      track.classList.toggle('globe-mode', view === 'globe');
   if (mapLabel)   mapLabel.classList.toggle('active',   view === 'map');
   if (globeLabel) globeLabel.classList.toggle('active', view === 'globe');
+}
 
+function showWorldViewContainer(view) {
   const mapContainer   = document.getElementById('globe-container');
   const globeContainer = document.getElementById('globe-gl-container');
-
   if (view === 'map') {
     if (globeContainer) globeContainer.classList.add('hidden');
     if (mapContainer)   mapContainer.classList.remove('hidden');
-    // Stop globe.gl rotation
-    if (_globeGLInstance) _globeGLInstance.controls().autoRotate = false;
-    // Init or resize the flat map
-    if (!_mapLoaded) {
-      initMapView();
-    } else if (_mapInstance) {
-      _mapInstance.resize();
-    }
   } else {
     if (mapContainer)   mapContainer.classList.add('hidden');
     if (globeContainer) globeContainer.classList.remove('hidden');
-    // Init or resume globe.gl
-    if (!_globeGLLoaded) {
-      initGlobeGLView();
-    } else if (_globeGLInstance) {
-      _globeGLInstance.controls().autoRotate = true;
-    }
   }
+}
+
+function fadeWorldView(fromEl, toEl, done) {
+  ensureWorldViewTransitionStyles();
+  if (!fromEl || !toEl) { if (done) done(); return; }
+
+  _isViewTransitioning = true;
+  toEl.classList.remove('hidden');
+  toEl.classList.add('world-view-fade-in');
+  fromEl.classList.add('world-view-fade-out');
+
+  window.setTimeout(() => {
+    fromEl.classList.add('hidden');
+    fromEl.classList.remove('world-view-fade-out');
+    toEl.classList.remove('world-view-fade-in');
+    _isViewTransitioning = false;
+    if (done) done();
+  }, 380);
+}
+
+function getCurrentGlobePointOfView() {
+  try {
+    const pov = _globeGLInstance && _globeGLInstance.pointOfView && _globeGLInstance.pointOfView();
+    if (pov && Number.isFinite(pov.lat) && Number.isFinite(pov.lng)) return pov;
+  } catch (_) {}
+  return { ..._globeHomePoint, altitude: 1.8 };
+}
+
+function getCurrentGlobeDistance() {
+  try {
+    const controls = _globeGLInstance && _globeGLInstance.controls && _globeGLInstance.controls();
+    if (controls && typeof controls.getDistance === 'function') return controls.getDistance();
+  } catch (_) {}
+  try {
+    const cam = _globeGLInstance && _globeGLInstance.camera && _globeGLInstance.camera();
+    if (cam && cam.position) return cam.position.length();
+  } catch (_) {}
+  return Infinity;
+}
+
+function transitionGlobeToMap(centerOverride = null) {
+  if (_isViewTransitioning || _activeView === 'map') return;
+  const mapContainer   = document.getElementById('globe-container');
+  const globeContainer = document.getElementById('globe-gl-container');
+
+  const pov = centerOverride || getCurrentGlobePointOfView();
+  const center = [Number.isFinite(pov.lng) ? pov.lng : _globeHomePoint.lng, Number.isFinite(pov.lat) ? pov.lat : _globeHomePoint.lat];
+
+  if (_globeGLInstance) {
+    _globeGLInstance.controls().autoRotate = false;
+    try { _globeGLInstance.pointOfView({ lat: center[1], lng: center[0], altitude: 0.85 }, 420); } catch (_) {}
+  }
+
+  const finish = () => {
+    _activeView = 'map';
+    syncWorldViewToggle('map');
+    if (!_mapLoaded) {
+      initMapView(center, 3.1);
+    } else if (_mapInstance) {
+      _mapInstance.resize();
+      _mapInstance.easeTo({ center, zoom: Math.max(_mapInstance.getZoom(), 3.1), duration: 520, essential: true });
+    }
+  };
+
+  window.setTimeout(() => {
+    if (!_mapLoaded) {
+      // First load: initialise hidden, then fade it in once MapLibre has a canvas.
+      if (mapContainer) mapContainer.classList.remove('hidden');
+      initMapView(center, 3.1, () => {
+        if (mapContainer) mapContainer.classList.add('hidden');
+        fadeWorldView(globeContainer, mapContainer, finish);
+      });
+    } else {
+      fadeWorldView(globeContainer, mapContainer, finish);
+    }
+  }, 210);
+}
+
+function transitionMapToGlobe(centerOverride = null) {
+  if (_isViewTransitioning || _activeView === 'globe') return;
+  const mapContainer   = document.getElementById('globe-container');
+  const globeContainer = document.getElementById('globe-gl-container');
+
+  let center = centerOverride;
+  if (!center && _mapInstance) {
+    const c = _mapInstance.getCenter();
+    center = { lat: c.lat, lng: c.lng };
+    _lastMapZoom = _mapInstance.getZoom();
+  }
+  center = center || _lastMapCenter || _globeHomePoint;
+
+  const finish = () => {
+    _activeView = 'globe';
+    syncWorldViewToggle('globe');
+    if (_globeGLInstance) {
+      _globeGLInstance.controls().autoRotate = true;
+      try { _globeGLInstance.pointOfView({ lat: center.lat, lng: center.lng, altitude: 2.0 }, 650); } catch (_) {}
+    }
+  };
+
+  if (!_globeGLLoaded) {
+    if (globeContainer) globeContainer.classList.remove('hidden');
+    initGlobeGLView().then(() => {
+      try { _globeGLInstance.pointOfView({ lat: center.lat, lng: center.lng, altitude: 2.0 }, 1); } catch (_) {}
+      if (globeContainer) globeContainer.classList.add('hidden');
+      fadeWorldView(mapContainer, globeContainer, finish);
+    });
+  } else {
+    try { _globeGLInstance.pointOfView({ lat: center.lat, lng: center.lng, altitude: 1.05 }, 1); } catch (_) {}
+    fadeWorldView(mapContainer, globeContainer, finish);
+  }
+}
+
+// ── View toggle ────────────────────────────────────────────────
+function switchGlobeView(view) {
+  if (_activeView === view) return;
+
+  // The toggle now behaves like a zoom shortcut:
+  // Globe → Map zooms into detail. Map → Globe pulls back to the 3D view.
+  if (view === 'map') {
+    transitionGlobeToMap();
+  } else {
+    transitionMapToGlobe();
+  }
+}
+
+function scheduleGlobeZoomCheck() {
+  clearTimeout(_globeAutoSwitchTimer);
+  _globeAutoSwitchTimer = setTimeout(() => {
+    if (_activeView !== 'globe' || _isViewTransitioning || !_globeGLInstance) return;
+    const dist = getCurrentGlobeDistance();
+    // Globe.gl camera distance is roughly 300 at the default altitude of 2.0.
+    // Around 190 feels like the point where a real map becomes more useful.
+    if (dist < 190) transitionGlobeToMap();
+  }, 140);
+}
+
+function ensureWorldViewTransitionStyles() {
+  if (document.getElementById('world-view-transition-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'world-view-transition-styles';
+  style.textContent = `
+    #globe-container,
+    #globe-gl-container {
+      transition: opacity 360ms ease, transform 360ms ease, filter 360ms ease;
+      will-change: opacity, transform, filter;
+    }
+    #globe-container.world-view-fade-in,
+    #globe-gl-container.world-view-fade-in {
+      opacity: 0;
+      transform: scale(1.018);
+      filter: blur(2px);
+      animation: crustWorldFadeIn 360ms ease forwards;
+    }
+    #globe-container.world-view-fade-out,
+    #globe-gl-container.world-view-fade-out {
+      opacity: 1;
+      animation: crustWorldFadeOut 360ms ease forwards;
+    }
+    @keyframes crustWorldFadeIn {
+      from { opacity:0; transform:scale(1.018); filter:blur(2px); }
+      to   { opacity:1; transform:scale(1);     filter:blur(0); }
+    }
+    @keyframes crustWorldFadeOut {
+      from { opacity:1; transform:scale(1);     filter:blur(0); }
+      to   { opacity:0; transform:scale(.985);  filter:blur(1px); }
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 // ── Shared data fetch ──────────────────────────────────────────
@@ -163,7 +320,7 @@ function loadMapLibre() {
   });
 }
 
-async function initMapView() {
+async function initMapView(initialCenter = [-70, 18], initialZoom = 2, onReady = null) {
   const container = document.getElementById('globe-container');
   if (!container || !currentUser) return;
   container.innerHTML = '<div class="globe-loading">Loading map…</div>';
@@ -181,8 +338,8 @@ async function initMapView() {
     _mapInstance = new maplibregl.Map({
       container:          'globe-container',
       style:              crustMapStyle(),
-      center:             [-70, 18],   // Caribbean / Puerto Rico
-      zoom:               2,
+      center:             initialCenter,
+      zoom:               initialZoom,
       minZoom:            0.5,
       maxZoom:            18,
       attributionControl: false,
@@ -356,10 +513,23 @@ async function initMapView() {
       });
 
       _mapLoaded = true;
+      if (typeof onReady === 'function') onReady();
     });
 
     // Map tap outside pins → dismiss popup
     _mapInstance.on('click', closeGlobePopup);
+
+    _mapInstance.on('moveend', () => {
+      if (!_mapInstance) return;
+      const c = _mapInstance.getCenter();
+      _lastMapCenter = { lat: c.lat, lng: c.lng };
+      _lastMapZoom = _mapInstance.getZoom();
+    });
+
+    _mapInstance.on('zoomend', () => {
+      if (_activeView !== 'map' || _isViewTransitioning || !_mapInstance) return;
+      if (_mapInstance.getZoom() <= 1.45) transitionMapToGlobe();
+    });
 
   } catch (e) {
     console.error('initMapView:', e);
@@ -460,6 +630,7 @@ async function initGlobeGLView() {
     // Start centered on the user's home base (most-visited point or default PR)
     const homeLat = origin ? origin.lat : 18;
     const homeLng = origin ? origin.lng : -66;
+    _globeHomePoint = { lat: homeLat, lng: homeLng };
     _globeGLInstance.pointOfView({ lat: homeLat, lng: homeLng, altitude: 2.0 });
 
     // Auto-rotate — pauses the moment user touches the globe
@@ -470,6 +641,14 @@ async function initGlobeGLView() {
     container.addEventListener('pointerdown', () => {
       if (_globeGLInstance) _globeGLInstance.controls().autoRotate = false;
     }, { passive: true });
+
+    // Auto-transition to map once the user zooms into the globe far enough.
+    try {
+      _globeGLInstance.controls().addEventListener('change', scheduleGlobeZoomCheck);
+    } catch (_) {
+      container.addEventListener('wheel', scheduleGlobeZoomCheck, { passive: true });
+      container.addEventListener('touchmove', scheduleGlobeZoomCheck, { passive: true });
+    }
 
     _globeGLLoaded = true;
 
