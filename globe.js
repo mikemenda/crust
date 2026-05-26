@@ -353,13 +353,27 @@ async function initGlobeGLView() {
       // Bump map: adds terrain relief so continents catch the amber atmosphere light
       .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
 
-      // ── Pizza location dots ────────────────────────────────────
-      .pointsData(points)
+      // ── Stacked bullseye pins: 3 layers at increasing altitudes ─
+      // Viewed from above they render as concentric circles:
+      // terracotta outer disc → cream ring → white center dot
+      .pointsData([
+        ...points.map(p => ({ ...p, _pin: 'outer'  })),
+        ...points.map(p => ({ ...p, _pin: 'cream'  })),
+        ...points.map(p => ({ ...p, _pin: 'center' })),
+      ])
       .pointLat('lat')
       .pointLng('lng')
-      .pointColor(() => '#D85A30')
-      .pointAltitude(0.02)
-      .pointRadius(p => Math.max(0.45, Math.min(1.6, 0.45 + (p.visitCount - 1) * 0.22)))
+      .pointColor(p =>
+        p._pin === 'outer' ? '#D85A30' :
+        p._pin === 'cream' ? '#F0EAD6' : '#FFFFFF'
+      )
+      .pointRadius(p => {
+        const base = Math.max(0.80, Math.min(2.2, 0.80 + (p.visitCount - 1) * 0.28));
+        return p._pin === 'outer' ? base : p._pin === 'cream' ? base * 0.60 : base * 0.22;
+      })
+      .pointAltitude(p =>
+        p._pin === 'outer' ? 0.015 : p._pin === 'cream' ? 0.026 : 0.040
+      )
       .onPointClick(p => showGlobePopup(p))
 
       // ── Glowing animated rings (the beacon effect) ─────────────
