@@ -2528,17 +2528,36 @@ function loadGlobeGL() {
 
     const existing = document.querySelector('script[data-crust-globe-gl]');
     if (existing) {
-      existing.addEventListener('load', resolve);
-      existing.addEventListener('error', reject);
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Existing globe.gl script failed')));
       return;
     }
 
     const script = document.createElement('script');
-    script.src = 'https://unpkg.com/globe.gl';
+
+    // More reliable CDN than unpkg for mobile Safari
+    script.src = 'https://cdn.jsdelivr.net/npm/globe.gl/dist/globe.gl.min.js';
     script.async = true;
     script.dataset.crustGlobeGl = 'true';
-    script.onload = resolve;
-    script.onerror = reject;
+
+    const timeout = setTimeout(() => {
+      reject(new Error('globe.gl load timed out'));
+    }, 10000);
+
+    script.onload = () => {
+      clearTimeout(timeout);
+      if (window.Globe) {
+        resolve();
+      } else {
+        reject(new Error('globe.gl loaded but window.Globe is missing'));
+      }
+    };
+
+    script.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error('Could not load globe.gl script'));
+    };
+
     document.head.appendChild(script);
   });
 }
