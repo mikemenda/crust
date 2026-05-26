@@ -2562,6 +2562,30 @@ function loadGlobeGL() {
   });
 }
 
+
+function globeDateKey(value) {
+  if (!value) return '';
+
+  let d = null;
+
+  if (value.toDate && typeof value.toDate === 'function') {
+    d = value.toDate();
+  } else if (value instanceof Date) {
+    d = value;
+  } else if (typeof value === 'string') {
+    return value;
+  } else if (typeof value === 'number') {
+    d = new Date(value);
+  }
+
+  if (!d || isNaN(d)) return '';
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function resizeCrustGlobe() {
   if (!_globeInstance) return;
 
@@ -2667,6 +2691,7 @@ function buildGlobePoints(visits) {
     if (!v.placeId || Number.isNaN(lat) || Number.isNaN(lng)) return;
 
     const pid = v.placeId;
+    const dateKey = globeDateKey(v.date);
 
     if (!placeMap[pid]) {
       placeMap[pid] = {
@@ -2678,8 +2703,8 @@ function buildGlobePoints(visits) {
         lng,
         visitCount: 0,
         ratings:    [],
-        firstDate:  v.date || '',
-        lastDate:   v.date || '',
+        firstDate:  dateKey,
+        lastDate:   dateKey,
       };
     }
 
@@ -2690,22 +2715,18 @@ function buildGlobePoints(visits) {
       if (!Number.isNaN(rating)) placeMap[pid].ratings.push(rating);
     }
 
-    if (v.date) {
-      if (!placeMap[pid].firstDate || v.date < placeMap[pid].firstDate) {
-        placeMap[pid].firstDate = v.date;
+    if (dateKey) {
+      if (!placeMap[pid].firstDate || dateKey < placeMap[pid].firstDate) {
+        placeMap[pid].firstDate = dateKey;
       }
-      if (!placeMap[pid].lastDate || v.date > placeMap[pid].lastDate) {
-        placeMap[pid].lastDate = v.date;
+      if (!placeMap[pid].lastDate || dateKey > placeMap[pid].lastDate) {
+        placeMap[pid].lastDate = dateKey;
       }
     }
   });
 
   return Object.values(placeMap)
-    .sort((a, b) => {
-      const ad = a.firstDate || '';
-      const bd = b.firstDate || '';
-      return ad.localeCompare(bd);
-    });
+    .sort((a, b) => (a.firstDate || '').localeCompare(b.firstDate || ''));
 }
 
 function buildGlobeArcs(visits) {
@@ -2714,7 +2735,7 @@ function buildGlobeArcs(visits) {
     .map(v => ({
       lat: Number(v.lat),
       lng: Number(v.lng),
-      date: v.date || '',
+      date: globeDateKey(v.date),
       placeId: v.placeId || '',
     }))
     .filter(v => !Number.isNaN(v.lat) && !Number.isNaN(v.lng))
