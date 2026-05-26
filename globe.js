@@ -234,10 +234,10 @@ async function initMapView() {
         source: 'pizza-places',
         filter: ['has', 'point_count'],
         paint: {
-          'circle-color':        'rgba(216,90,48,0.20)',
-          'circle-radius':       ['step', ['get', 'point_count'], 30, 5, 36, 15, 42],
-          'circle-blur':         0.72,
-          'circle-opacity':      0.95,
+          'circle-color':        'rgba(216,90,48,0.34)',
+          'circle-radius':       ['step', ['get', 'point_count'], 34, 5, 41, 15, 48],
+          'circle-blur':         0.62,
+          'circle-opacity':      1,
         }
       });
 
@@ -248,8 +248,8 @@ async function initMapView() {
         paint: {
           'circle-color':        '#D85A30',
           'circle-radius':       ['step', ['get', 'point_count'], 18, 5, 21, 15, 24],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': 'rgba(200,169,126,0.70)',
+          'circle-stroke-width': 2.4,
+          'circle-stroke-color': 'rgba(240,234,214,0.46)',
         }
       });
 
@@ -258,7 +258,7 @@ async function initMapView() {
         source: 'pizza-places',
         filter: ['has', 'point_count'],
         paint: {
-          'circle-color':        'rgba(240,234,214,0.16)',
+          'circle-color':        'rgba(240,234,214,0.22)',
           'circle-radius':       ['step', ['get', 'point_count'], 11, 5, 13, 15, 15],
           'circle-stroke-width': 1,
           'circle-stroke-color': 'rgba(240,234,214,0.42)',
@@ -289,10 +289,10 @@ async function initMapView() {
         source: 'pizza-places',
         filter: ['!', ['has', 'point_count']],
         paint: {
-          'circle-color':   'rgba(216,90,48,0.24)',
-          'circle-radius':  25,
-          'circle-blur':    0.76,
-          'circle-opacity': 0.95,
+          'circle-color':   'rgba(216,90,48,0.38)',
+          'circle-radius':  30,
+          'circle-blur':    0.62,
+          'circle-opacity': 1,
         }
       });
 
@@ -303,8 +303,8 @@ async function initMapView() {
         paint: {
           'circle-color':        '#D85A30',
           'circle-radius':       14,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': 'rgba(200,169,126,0.72)',
+          'circle-stroke-width': 2.3,
+          'circle-stroke-color': 'rgba(240,234,214,0.50)',
         }
       });
 
@@ -314,7 +314,7 @@ async function initMapView() {
         filter: ['!', ['has', 'point_count']],
         paint: {
           'circle-color':        '#F0EAD6',
-          'circle-radius':       8,
+          'circle-radius':       8.5,
           'circle-stroke-width': 1,
           'circle-stroke-color': 'rgba(200,169,126,0.55)',
         }
@@ -492,7 +492,7 @@ function ensureCrustMapViewStyles() {
   style.textContent = `
     #globe-container.crust-map-view {
       position:relative;
-      background:#061224;
+      background:#061426;
     }
     #globe-container.crust-map-view::after {
       content:'';
@@ -501,12 +501,11 @@ function ensureCrustMapViewStyles() {
       pointer-events:none;
       z-index:2;
       background:
-        radial-gradient(circle at 50% 48%, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0) 42%),
-        linear-gradient(to bottom, rgba(20,20,20,.20) 0%, rgba(20,20,20,0) 18%, rgba(20,20,20,0) 72%, rgba(20,20,20,.26) 100%),
-        linear-gradient(to right, rgba(20,20,20,.16) 0%, rgba(20,20,20,0) 16%, rgba(20,20,20,0) 84%, rgba(20,20,20,.16) 100%);
+        radial-gradient(circle at 50% 48%, rgba(255,255,255,0.018) 0%, rgba(255,255,255,0) 48%),
+        linear-gradient(to bottom, rgba(20,20,20,.10) 0%, rgba(20,20,20,0) 20%, rgba(20,20,20,0) 76%, rgba(20,20,20,.15) 100%);
     }
     #globe-container.crust-map-view .maplibregl-canvas {
-      filter:saturate(.94) contrast(1.08) brightness(.88);
+      filter:saturate(1.02) contrast(1.12) brightness(.98);
     }
   `;
   document.head.appendChild(style);
@@ -528,20 +527,20 @@ function crustMapStyle() {
       ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }
     },
     layers: [
-      { id: 'bg',    type: 'background', paint: { 'background-color': '#07111F' } },
+      { id: 'bg',    type: 'background', paint: { 'background-color': '#142238' } },
       { id: 'water', type: 'fill', source: 'ofm', 'source-layer': 'water',
-        paint: { 'fill-color': '#061224' } },
+        paint: { 'fill-color': '#061326' } },
       { id: 'border-country', type: 'line', source: 'ofm', 'source-layer': 'boundary',
         filter: ['all', ['==', 'admin_level', 2], ['!=', 'maritime', 1]],
         paint: {
-          'line-color': 'rgba(200,169,126,0.24)',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.4, 6, 1.4],
+          'line-color': 'rgba(200,169,126,0.34)',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.55, 6, 1.65],
         } },
       { id: 'border-state', type: 'line', source: 'ofm', 'source-layer': 'boundary',
         filter: ['==', 'admin_level', 4], minzoom: 3,
         paint: {
-          'line-color':      'rgba(200,169,126,0.12)',
-          'line-width':      0.5,
+          'line-color':      'rgba(200,169,126,0.22)',
+          'line-width':      ['interpolate', ['linear'], ['zoom'], 3, 0.55, 8, 1.0],
           'line-dasharray':  [2, 3],
         } },
       { id: 'label-country', type: 'symbol', source: 'ofm', 'source-layer': 'place',
@@ -555,7 +554,7 @@ function crustMapStyle() {
           'text-allow-overlap':  false,
         },
         paint: {
-          'text-color':      'rgba(240,234,214,0.68)',
+          'text-color':      'rgba(240,234,214,0.76)',
           'text-halo-color': 'rgba(6,18,36,0.94)',
           'text-halo-width': 1.5,
         } },
@@ -570,7 +569,7 @@ function crustMapStyle() {
           'text-allow-overlap':  false,
         },
         paint: {
-          'text-color':      'rgba(240,234,214,0.46)',
+          'text-color':      'rgba(240,234,214,0.58)',
           'text-halo-color': 'rgba(6,18,36,0.94)',
           'text-halo-width': 1,
         } },
@@ -586,7 +585,7 @@ function crustMapStyle() {
           'text-allow-overlap': false,
         },
         paint: {
-          'text-color':      'rgba(240,234,214,0.56)',
+          'text-color':      'rgba(240,234,214,0.66)',
           'text-halo-color': 'rgba(6,18,36,0.94)',
           'text-halo-width': 1,
         } },
