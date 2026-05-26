@@ -175,6 +175,8 @@ async function initMapView() {
     const points = _visitPoints || [];
 
     container.innerHTML = '';
+    ensureCrustMapViewStyles();
+    container.classList.add('crust-map-view');
 
     _mapInstance = new maplibregl.Map({
       container:          'globe-container',
@@ -201,9 +203,7 @@ async function initMapView() {
         });
       } catch (_) {}
 
-      // Register pizza pin image — symbol layers never drift (unlike HTML markers)
-      const pinImg = await createPinImage();
-      if (pinImg) _mapInstance.addImage('crust-pin', pinImg, { pixelRatio: 2 });
+      // Map pins are drawn with native circle layers so they stay crisp, centered, and logo-free.
 
       // GeoJSON source with native clustering
       _mapInstance.addSource('pizza-places', {
@@ -228,16 +228,40 @@ async function initMapView() {
         clusterRadius:  50,
       });
 
-      // ── Cluster circle (terracotta, amber ring) ──────────────
+      // ── Cluster pins — globe-style glow + clean count ─────────
+      _mapInstance.addLayer({
+        id: 'cluster-halo', type: 'circle',
+        source: 'pizza-places',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color':        'rgba(216,90,48,0.20)',
+          'circle-radius':       ['step', ['get', 'point_count'], 30, 5, 36, 15, 42],
+          'circle-blur':         0.72,
+          'circle-opacity':      0.95,
+        }
+      });
+
       _mapInstance.addLayer({
         id: 'clusters', type: 'circle',
         source: 'pizza-places',
         filter: ['has', 'point_count'],
         paint: {
           'circle-color':        '#D85A30',
-          'circle-radius':       ['step', ['get', 'point_count'], 18, 5, 22, 15, 26],
-          'circle-stroke-width': 2.5,
-          'circle-stroke-color': '#C8A97E',
+          'circle-radius':       ['step', ['get', 'point_count'], 18, 5, 21, 15, 24],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': 'rgba(200,169,126,0.70)',
+        }
+      });
+
+      _mapInstance.addLayer({
+        id: 'cluster-inner', type: 'circle',
+        source: 'pizza-places',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color':        'rgba(240,234,214,0.16)',
+          'circle-radius':       ['step', ['get', 'point_count'], 11, 5, 13, 15, 15],
+          'circle-stroke-width': 1,
+          'circle-stroke-color': 'rgba(240,234,214,0.42)',
         }
       });
 
@@ -252,20 +276,57 @@ async function initMapView() {
           'text-size':          13,
           'text-allow-overlap': true,
         },
-        paint: { 'text-color': '#F0EAD6' }
+        paint: {
+          'text-color':      '#F0EAD6',
+          'text-halo-color': 'rgba(20,20,20,0.42)',
+          'text-halo-width': 0.8,
+        }
       });
 
-      // ── Individual pizza pins (unclustered) ──────────────────
+      // ── Individual pizza pins — same visual language as globe ─
       _mapInstance.addLayer({
-        id: 'unclustered-point', type: 'symbol',
+        id: 'unclustered-halo', type: 'circle',
         source: 'pizza-places',
         filter: ['!', ['has', 'point_count']],
-        layout: {
-          'icon-image':            'crust-pin',
-          'icon-size':             1,
-          'icon-anchor':           'bottom',
-          'icon-allow-overlap':    true,
-          'icon-ignore-placement': true,
+        paint: {
+          'circle-color':   'rgba(216,90,48,0.24)',
+          'circle-radius':  25,
+          'circle-blur':    0.76,
+          'circle-opacity': 0.95,
+        }
+      });
+
+      _mapInstance.addLayer({
+        id: 'unclustered-point', type: 'circle',
+        source: 'pizza-places',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color':        '#D85A30',
+          'circle-radius':       14,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': 'rgba(200,169,126,0.72)',
+        }
+      });
+
+      _mapInstance.addLayer({
+        id: 'unclustered-ring', type: 'circle',
+        source: 'pizza-places',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color':        '#F0EAD6',
+          'circle-radius':       8,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': 'rgba(200,169,126,0.55)',
+        }
+      });
+
+      _mapInstance.addLayer({
+        id: 'unclustered-dot', type: 'circle',
+        source: 'pizza-places',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color':  '#FFFFFF',
+          'circle-radius': 4,
         }
       });
 
@@ -379,7 +440,7 @@ async function initGlobeGLView() {
       .arcStartLng('startLng')
       .arcEndLat('endLat')
       .arcEndLng('endLng')
-      .arcColor(() => ['rgba(200,169,126,0.05)', 'rgba(200,169,126,0.90)'])
+      .arcColor(() => ['rgba(216,90,48,0.05)', 'rgba(216,90,48,0.92)'])
       .arcDashLength(0.28)
       .arcDashGap(0.72)
       .arcDashAnimateTime(4000)
@@ -422,6 +483,35 @@ async function initGlobeGLView() {
 // ── Crust dark map style (MapLibre) ───────────────────────────
 // OpenFreeMap vector tiles — free, no API key required.
 // Labels (country → state → city) built into tile data.
+
+// ── Map view polish — scoped to globe/map overlay only ─────────
+function ensureCrustMapViewStyles() {
+  if (document.getElementById('crust-map-view-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'crust-map-view-styles';
+  style.textContent = `
+    #globe-container.crust-map-view {
+      position:relative;
+      background:#061224;
+    }
+    #globe-container.crust-map-view::after {
+      content:'';
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      z-index:2;
+      background:
+        radial-gradient(circle at 50% 48%, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0) 42%),
+        linear-gradient(to bottom, rgba(20,20,20,.20) 0%, rgba(20,20,20,0) 18%, rgba(20,20,20,0) 72%, rgba(20,20,20,.26) 100%),
+        linear-gradient(to right, rgba(20,20,20,.16) 0%, rgba(20,20,20,0) 16%, rgba(20,20,20,0) 84%, rgba(20,20,20,.16) 100%);
+    }
+    #globe-container.crust-map-view .maplibregl-canvas {
+      filter:saturate(.94) contrast(1.08) brightness(.88);
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function crustMapStyle() {
   return {
     version:    8,
@@ -438,19 +528,19 @@ function crustMapStyle() {
       ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }
     },
     layers: [
-      { id: 'bg',    type: 'background', paint: { 'background-color': '#172338' } },
+      { id: 'bg',    type: 'background', paint: { 'background-color': '#07111F' } },
       { id: 'water', type: 'fill', source: 'ofm', 'source-layer': 'water',
-        paint: { 'fill-color': '#0A1628' } },
+        paint: { 'fill-color': '#061224' } },
       { id: 'border-country', type: 'line', source: 'ofm', 'source-layer': 'boundary',
         filter: ['all', ['==', 'admin_level', 2], ['!=', 'maritime', 1]],
         paint: {
-          'line-color': 'rgba(200,169,126,0.30)',
+          'line-color': 'rgba(200,169,126,0.24)',
           'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.4, 6, 1.4],
         } },
       { id: 'border-state', type: 'line', source: 'ofm', 'source-layer': 'boundary',
         filter: ['==', 'admin_level', 4], minzoom: 3,
         paint: {
-          'line-color':      'rgba(200,169,126,0.15)',
+          'line-color':      'rgba(200,169,126,0.12)',
           'line-width':      0.5,
           'line-dasharray':  [2, 3],
         } },
@@ -465,8 +555,8 @@ function crustMapStyle() {
           'text-allow-overlap':  false,
         },
         paint: {
-          'text-color':      'rgba(240,234,214,0.75)',
-          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-color':      'rgba(240,234,214,0.68)',
+          'text-halo-color': 'rgba(6,18,36,0.94)',
           'text-halo-width': 1.5,
         } },
       { id: 'label-state', type: 'symbol', source: 'ofm', 'source-layer': 'place',
@@ -480,8 +570,8 @@ function crustMapStyle() {
           'text-allow-overlap':  false,
         },
         paint: {
-          'text-color':      'rgba(240,234,214,0.52)',
-          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-color':      'rgba(240,234,214,0.46)',
+          'text-halo-color': 'rgba(6,18,36,0.94)',
           'text-halo-width': 1,
         } },
       { id: 'label-city', type: 'symbol', source: 'ofm', 'source-layer': 'place',
@@ -496,8 +586,8 @@ function crustMapStyle() {
           'text-allow-overlap': false,
         },
         paint: {
-          'text-color':      'rgba(240,234,214,0.62)',
-          'text-halo-color': 'rgba(10,22,40,0.92)',
+          'text-color':      'rgba(240,234,214,0.56)',
+          'text-halo-color': 'rgba(6,18,36,0.94)',
           'text-halo-width': 1,
         } },
     ],
