@@ -2101,7 +2101,6 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   background: transparent;
   padding: 0;
   cursor: pointer;
-  transform: translate(-50%, -50%);
   pointer-events: auto;
   animation: crustGlobePinIn 520ms cubic-bezier(.2,.9,.2,1) both;
   -webkit-tap-highlight-color: transparent;
@@ -2213,15 +2212,15 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
 @keyframes crustGlobePinIn {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.45);
+    transform: scale(0.45);
   }
   70% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1.12);
+    transform: scale(1.12);
   }
   100% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
   }
 }
 
