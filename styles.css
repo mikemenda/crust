@@ -1949,6 +1949,34 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
 .maplibregl-canvas-container,
 .maplibregl-canvas { width: 100% !important; height: 100% !important; }
 
+/* ── Globe sphere clip ── */
+.globe-container.globe-sphere-mode {
+  border-radius: 50% !important;
+  overflow: hidden;
+  flex: 0 0 auto;
+  align-self: center;
+  /* Amber glow ring + deep shadow to sell the sphere illusion */
+  box-shadow:
+    0 0 0 1.5px rgba(200,169,126,0.20),   /* subtle amber ring */
+    0 0 60px 8px rgba(0,0,0,0.60),        /* deep space shadow */
+    0 0 120px 20px rgba(200,169,126,0.06); /* faint amber aura */
+}
+/* Radial vignette — brighter upper-left, darker lower-right = sphere depth */
+.globe-container.globe-sphere-mode::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 32%,
+    transparent 38%,
+    rgba(0,0,0,0.20) 68%,
+    rgba(0,0,0,0.50) 100%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
 .globe-loading {
   position: absolute;
   inset: 0;

@@ -2487,9 +2487,41 @@ function openGlobe() {
   document.getElementById('globe-overlay').classList.remove('hidden');
   if (!_globeLoaded) {
     requestAnimationFrame(() => initGlobe());
-  } else if (_globeInstance && typeof _globeInstance.resize === 'function') {
-    requestAnimationFrame(() => _globeInstance.resize());
+  } else if (_globeInstance) {
+    requestAnimationFrame(() => {
+      _globeInstance.resize();
+      syncGlobeMode();
+    });
   }
+}
+
+// Toggles between sphere view (zoom ≤ 3.5) and full-screen map (zoom > 3.5).
+// Clips the map canvas to a circle with dark "space" visible in the corners.
+function syncGlobeMode() {
+  if (!_globeInstance) return;
+  const zoom      = _globeInstance.getZoom();
+  const container = document.getElementById('globe-container');
+  const overlay   = document.getElementById('globe-overlay');
+  if (!container || !overlay) return;
+
+  const isGlobe  = zoom <= 3.5;
+  const wasGlobe = container.classList.contains('globe-sphere-mode');
+
+  if (isGlobe) {
+    // Square canvas — size = min(available width, available height minus topbar)
+    const availW = overlay.offsetWidth;
+    const availH = overlay.offsetHeight - 60;  // ~60px topbar
+    const size   = Math.min(availW, availH) - 24; // 12px breathing room each side
+    container.style.width  = size + 'px';
+    container.style.height = size + 'px';
+    container.classList.add('globe-sphere-mode');
+  } else {
+    container.style.width  = '';
+    container.style.height = '';
+    container.classList.remove('globe-sphere-mode');
+  }
+
+  if (wasGlobe !== isGlobe) _globeInstance.resize();
 }
 
 function closeGlobe() {
@@ -2555,8 +2587,8 @@ async function initGlobe() {
     _globeInstance = new maplibregl.Map({
       container:          'globe-container',
       style:              crustMapStyle(),
-      center:             [0, 20],
-      zoom:               1.5,
+      center:             [-70, 18],    // Caribbean — Puerto Rico / North America
+      zoom:               2,
       minZoom:            0.5,
       maxZoom:            18,
       attributionControl: false,
@@ -2671,6 +2703,10 @@ async function initGlobe() {
       });
 
       _globeLoaded = true;
+
+      // Apply sphere clip on open; re-sync whenever user zooms
+      syncGlobeMode();
+      _globeInstance.on('zoomend', syncGlobeMode);
     });
 
     // Map tap outside pins → dismiss popup
