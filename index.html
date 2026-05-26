@@ -805,10 +805,14 @@
       <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--amber);">World Map</span>
       <div style="width:32px;"></div>
     </div>
-    <!-- ─ Map / Globe toggle ─ -->
-    <div class="globe-view-toggle">
-      <button id="toggle-map-btn"   class="globe-toggle-btn active" onclick="switchGlobeView('map')">Map</button>
-      <button id="toggle-globe-btn" class="globe-toggle-btn"        onclick="switchGlobeView('globe')">Globe</button>
+    <!-- ─ Floating Map / Globe toggle — overlaid on the map/globe ─ -->
+    <div class="globe-view-toggle" id="globe-view-toggle"
+         onclick="switchGlobeView(_activeView === 'map' ? 'globe' : 'map')">
+      <span class="gvt-label active" id="gvt-map-label">Map</span>
+      <div class="gvt-track" id="gvt-track">
+        <div class="gvt-thumb"></div>
+      </div>
+      <span class="gvt-label" id="gvt-globe-label">Globe</span>
     </div>
 
     <div id="globe-container" class="globe-container"></div>

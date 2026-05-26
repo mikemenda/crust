@@ -78,11 +78,13 @@ function switchGlobeView(view) {
   if (_activeView === view) return;
   _activeView = view;
 
-  // Update toggle buttons
-  const mapBtn   = document.getElementById('toggle-map-btn');
-  const globeBtn = document.getElementById('toggle-globe-btn');
-  if (mapBtn)   mapBtn.classList.toggle('active',   view === 'map');
-  if (globeBtn) globeBtn.classList.toggle('active', view === 'globe');
+  // Update toggle UI
+  const track      = document.getElementById('gvt-track');
+  const mapLabel   = document.getElementById('gvt-map-label');
+  const globeLabel = document.getElementById('gvt-globe-label');
+  if (track)      track.classList.toggle('globe-mode', view === 'globe');
+  if (mapLabel)   mapLabel.classList.toggle('active',   view === 'map');
+  if (globeLabel) globeLabel.classList.toggle('active', view === 'globe');
 
   const mapContainer   = document.getElementById('globe-container');
   const globeContainer = document.getElementById('globe-gl-container');
