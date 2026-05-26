@@ -805,7 +805,15 @@
       <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--amber);">World Map</span>
       <div style="width:32px;"></div>
     </div>
+    <!-- ─ Map / Globe toggle ─ -->
+    <div class="globe-view-toggle">
+      <button id="toggle-map-btn"   class="globe-toggle-btn active" onclick="switchGlobeView('map')">Map</button>
+      <button id="toggle-globe-btn" class="globe-toggle-btn"        onclick="switchGlobeView('globe')">Globe</button>
+    </div>
+
     <div id="globe-container" class="globe-container"></div>
+    <!-- ─ globe.gl 3D sphere container (hidden by default) ─ -->
+    <div id="globe-gl-container" class="globe-gl-container hidden"></div>
 
     <!-- ─ Pin info popup — slides up on pin tap ─ -->
     <div id="globe-pin-popup" class="globe-pin-popup hidden">
@@ -859,6 +867,7 @@
 
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
+<script src="globe.js"></script>
 
 </body>
 </html>

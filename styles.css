@@ -1941,6 +1941,44 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   position: relative;
   overflow: hidden;
 }
+
+/* ── Map / Globe view toggle ── */
+.globe-view-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 8px 20px 10px;
+  flex-shrink: 0;
+  background: #141414;
+}
+.globe-toggle-btn {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 20px;
+  border: 1px solid rgba(200,169,126,0.2);
+  background: transparent;
+  color: rgba(240,234,214,0.4);
+  font-family: Outfit, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all .18s ease;
+}
+.globe-toggle-btn.active {
+  background: #C8A97E;
+  color: #141414;
+  border-color: #C8A97E;
+  font-weight: 600;
+}
+
+/* ── globe.gl 3D container ── */
+.globe-gl-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.globe-gl-container.hidden { display: none; }
+.globe-gl-container canvas { display: block; }
 /* MapLibre GL JS overrides — hide branding, match Crust dark theme */
 .maplibregl-ctrl-attrib,
 .maplibregl-ctrl-logo,
