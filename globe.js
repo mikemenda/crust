@@ -332,19 +332,61 @@ async function initGlobeGLView() {
 
     container.innerHTML = '';
 
+    // ── Arcs: radiate from most-visited spot to all others ───────
+    // (same pattern as Tripsy flight paths — home → destinations)
+    const origin = points.length
+      ? points.reduce((best, p) => p.visitCount > best.visitCount ? p : best, points[0])
+      : null;
+    const arcs = origin
+      ? points
+          .filter(p => p.placeId !== origin.placeId)
+          .map(p => ({ startLat: origin.lat, startLng: origin.lng, endLat: p.lat, endLng: p.lng }))
+      : [];
+
     _globeGLInstance = Globe()(container)
       .backgroundColor('#141414')
+      .showAtmosphere(true)
       .atmosphereColor('#C8A97E')
-      .atmosphereAltitude(0.14)
-      // WebGL point dots — reliable on iOS, never drift
+      .atmosphereAltitude(0.20)
+      // Earth texture: night side shows city-light glow + subtle continent shapes
+      .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+      // Bump map: adds terrain relief so continents catch the amber atmosphere light
+      .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+
+      // ── Pizza location dots ────────────────────────────────────
       .pointsData(points)
       .pointLat('lat')
       .pointLng('lng')
-      .pointColor(p => p.visitCount > 1 ? '#D85A30' : '#C8A97E')
-      .pointAltitude(0.015)
-      .pointRadius(p => Math.max(0.35, Math.min(1.2, 0.35 + (p.visitCount - 1) * 0.15)))
+      .pointColor(() => '#D85A30')
+      .pointAltitude(0.02)
+      .pointRadius(p => Math.max(0.45, Math.min(1.6, 0.45 + (p.visitCount - 1) * 0.22)))
       .onPointClick(p => showGlobePopup(p))
-      // Continent + ocean labels
+
+      // ── Glowing animated rings (the beacon effect) ─────────────
+      // ringColor gets d (data obj) → returns a fn t→color where t∈[0,1] is ring progress
+      .ringsData(points)
+      .ringLat('lat')
+      .ringLng('lng')
+      .ringColor(() => t => `rgba(216,90,48,${Math.max(0, 1 - t)})`)
+      .ringMaxRadius(3.5)
+      .ringPropagationSpeed(1.0)
+      .ringRepeatPeriod(1400)
+      .ringAltitude(0.02)
+
+      // ── Animated arcs from home → destinations ─────────────────
+      .arcsData(arcs)
+      .arcStartLat('startLat')
+      .arcStartLng('startLng')
+      .arcEndLat('endLat')
+      .arcEndLng('endLng')
+      .arcColor(() => ['rgba(200,169,126,0.05)', 'rgba(200,169,126,0.90)'])
+      .arcDashLength(0.28)
+      .arcDashGap(0.72)
+      .arcDashAnimateTime(4000)
+      .arcStroke(0.40)
+      .arcAltitudeAutoScale(0.38)
+
+      // ── Continent + ocean labels ───────────────────────────────
       .labelsData(_geoLabels)
       .labelText('text')
       .labelLat('lat')
@@ -354,12 +396,14 @@ async function initGlobeGLView() {
       .labelDotRadius(0)
       .labelResolution(2);
 
-    // Initial POV — centered on the Americas (Puerto Rico area)
-    _globeGLInstance.pointOfView({ lat: 18, lng: -70, altitude: 2.5 });
+    // Start centered on the user's home base (most-visited point or default PR)
+    const homeLat = origin ? origin.lat : 18;
+    const homeLng = origin ? origin.lng : -66;
+    _globeGLInstance.pointOfView({ lat: homeLat, lng: homeLng, altitude: 2.0 });
 
-    // Auto-rotate — stops on any user interaction
+    // Auto-rotate — pauses the moment user touches the globe
     _globeGLInstance.controls().autoRotate      = true;
-    _globeGLInstance.controls().autoRotateSpeed = 0.8;
+    _globeGLInstance.controls().autoRotateSpeed = 0.5;
     _globeGLInstance.controls().enableDamping   = true;
 
     container.addEventListener('pointerdown', () => {
