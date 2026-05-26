@@ -115,7 +115,7 @@ function fadeWorldView(fromEl, toEl, done) {
     toEl.classList.remove('world-view-fade-in');
     _isViewTransitioning = false;
     if (done) done();
-  }, 380);
+  }, 440);
 }
 
 function getCurrentGlobePointOfView() {
@@ -145,20 +145,26 @@ function transitionGlobeToMap(centerOverride = null) {
 
   const pov = centerOverride || getCurrentGlobePointOfView();
   const center = [Number.isFinite(pov.lng) ? pov.lng : _globeHomePoint.lng, Number.isFinite(pov.lat) ? pov.lat : _globeHomePoint.lat];
+  const targetZoom = Number.isFinite(pov.zoom) ? pov.zoom : 3.35;
 
   if (_globeGLInstance) {
     _globeGLInstance.controls().autoRotate = false;
-    try { _globeGLInstance.pointOfView({ lat: center[1], lng: center[0], altitude: 0.85 }, 420); } catch (_) {}
+    try { _globeGLInstance.pointOfView({ lat: center[1], lng: center[0], altitude: 0.95 }, 360); } catch (_) {}
   }
+
+  const prepareLoadedMap = () => {
+    if (_mapInstance) {
+      _mapInstance.resize();
+      _mapInstance.jumpTo({ center, zoom: targetZoom });
+    }
+  };
 
   const finish = () => {
     _activeView = 'map';
     syncWorldViewToggle('map');
-    if (!_mapLoaded) {
-      initMapView(center, 3.1);
-    } else if (_mapInstance) {
+    if (_mapInstance) {
       _mapInstance.resize();
-      _mapInstance.easeTo({ center, zoom: Math.max(_mapInstance.getZoom(), 3.1), duration: 520, essential: true });
+      _mapInstance.easeTo({ center, zoom: targetZoom, duration: 220, essential: true });
     }
   };
 
@@ -166,14 +172,15 @@ function transitionGlobeToMap(centerOverride = null) {
     if (!_mapLoaded) {
       // First load: initialise hidden, then fade it in once MapLibre has a canvas.
       if (mapContainer) mapContainer.classList.remove('hidden');
-      initMapView(center, 3.1, () => {
+      initMapView(center, targetZoom, () => {
         if (mapContainer) mapContainer.classList.add('hidden');
         fadeWorldView(globeContainer, mapContainer, finish);
       });
     } else {
+      prepareLoadedMap();
       fadeWorldView(globeContainer, mapContainer, finish);
     }
-  }, 210);
+  }, 140);
 }
 
 function transitionMapToGlobe(centerOverride = null) {
@@ -230,8 +237,8 @@ function scheduleGlobeZoomCheck() {
     if (_activeView !== 'globe' || _isViewTransitioning || !_globeGLInstance) return;
     const dist = getCurrentGlobeDistance();
     // Globe.gl camera distance is roughly 300 at the default altitude of 2.0.
-    // Around 190 feels like the point where a real map becomes more useful.
-    if (dist < 190) transitionGlobeToMap();
+    // Around 245 makes the handoff happen earlier, before the globe feels over-zoomed.
+    if (dist < 245) transitionGlobeToMap();
   }, 140);
 }
 
@@ -242,14 +249,14 @@ function ensureWorldViewTransitionStyles() {
   style.textContent = `
     #globe-container,
     #globe-gl-container {
-      transition: opacity 360ms ease, transform 360ms ease, filter 360ms ease;
+      transition: opacity 420ms ease, transform 420ms ease;
       will-change: opacity, transform, filter;
     }
     #globe-container.world-view-fade-in,
     #globe-gl-container.world-view-fade-in {
       opacity: 0;
       transform: scale(1.018);
-      filter: blur(2px);
+      
       animation: crustWorldFadeIn 360ms ease forwards;
     }
     #globe-container.world-view-fade-out,
@@ -258,12 +265,12 @@ function ensureWorldViewTransitionStyles() {
       animation: crustWorldFadeOut 360ms ease forwards;
     }
     @keyframes crustWorldFadeIn {
-      from { opacity:0; transform:scale(1.018); filter:blur(2px); }
-      to   { opacity:1; transform:scale(1);     filter:blur(0); }
+      from { opacity:0; transform:scale(1.018);  }
+      to   { opacity:1; transform:scale(1);      }
     }
     @keyframes crustWorldFadeOut {
-      from { opacity:1; transform:scale(1);     filter:blur(0); }
-      to   { opacity:0; transform:scale(.985);  filter:blur(1px); }
+      from { opacity:1; transform:scale(1);      }
+      to   { opacity:0; transform:scale(.985);   }
     }
   `;
   document.head.appendChild(style);
@@ -528,7 +535,7 @@ async function initMapView(initialCenter = [-70, 18], initialZoom = 2, onReady =
 
     _mapInstance.on('zoomend', () => {
       if (_activeView !== 'map' || _isViewTransitioning || !_mapInstance) return;
-      if (_mapInstance.getZoom() <= 1.45) transitionMapToGlobe();
+      if (_mapInstance.getZoom() <= 1.75) transitionMapToGlobe();
     });
 
   } catch (e) {
@@ -891,7 +898,8 @@ function buildCrustGlobeMarker(d) {
   el.addEventListener('click', e => {
     e.preventDefault();
     e.stopPropagation();
-    showGlobePopup(d);
+    closeGlobePopup();
+    transitionGlobeToMap({ lat: d.lat, lng: d.lng, zoom: d.visitCount > 1 ? 5.0 : 5.7 });
   });
 
   return el;
