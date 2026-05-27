@@ -1918,101 +1918,80 @@ function renderPassportContent(visits, places, body) {
 }
 
 function buildPizzaChart(styleData, totalPies) {
+  const total = styleData.reduce((s, d) => s + d.count, 0);
+  if (!total) return '';
+
   const cx = 120;
   const cy = 120;
-  const outerR = 82;
-  const innerR = 43;
-  const total = styleData.reduce((s, d) => s + d.count, 0);
-  const isSingle = styleData.length === 1;
-
-  let angle = -Math.PI / 2;
-  const gap = isSingle ? 0 : 0.018;
-
-  function polar(radius, a) {
-    return {
-      x: +(cx + radius * Math.cos(a)).toFixed(2),
-      y: +(cy + radius * Math.sin(a)).toFixed(2)
-    };
-  }
-
-  function donutSlicePath(sa, ea) {
-    const outerStart = polar(outerR, sa);
-    const outerEnd   = polar(outerR, ea);
-    const innerEnd   = polar(innerR, ea);
-    const innerStart = polar(innerR, sa);
-    const largeArc   = ea - sa > Math.PI ? 1 : 0;
-
-    return `
-      M ${outerStart.x} ${outerStart.y}
-      A ${outerR} ${outerR} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}
-      L ${innerEnd.x} ${innerEnd.y}
-      A ${innerR} ${innerR} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}
-      Z
-    `;
-  }
+  const radius = 72;
+  const stroke = 24;
+  const gap = styleData.length === 1 ? 0 : 0.9;
+  let offset = 0;
 
   const segments = styleData.map((d, i) => {
     const frac = d.count / total;
-    const rawStart = angle;
-    const rawEnd = angle + frac * Math.PI * 2;
-
-    // Keep tiny slices visible while still preserving a clean separation.
-    const available = rawEnd - rawStart;
-    const sliceGap = Math.min(gap, Math.max(0, available * 0.18));
-    const sa = rawStart + sliceGap;
-    const ea = rawEnd - sliceGap;
-
-    angle = rawEnd;
-
-    return {
+    const pct = frac * 100;
+    const dash = Math.max(0, pct - gap);
+    const seg = {
       label: d.label,
       count: d.count,
       frac,
+      pct: Math.round(pct),
       color: STYLE_COLORS[d.label] || '#777',
-      path: donutSlicePath(sa, ea),
-      delay: i * 42
+      dash,
+      offset: offset + (gap / 2),
+      delay: i * 55,
     };
+    offset += pct;
+    return seg;
   });
 
-  const slicesSvg = segments.map(s => `
-    <path
-      class="pizza-donut-slice"
-      d="${s.path}"
-      fill="${s.color}"
+  const rings = segments.map(s => `
+    <circle
+      class="style-ring-segment"
+      cx="${cx}"
+      cy="${cy}"
+      r="${radius}"
+      fill="none"
+      stroke="${s.color}"
+      stroke-width="${stroke}"
+      pathLength="100"
+      stroke-dasharray="${s.dash} ${100 - s.dash}"
+      stroke-dashoffset="${-s.offset}"
+      transform="rotate(-90 ${cx} ${cy})"
       style="--delay:${s.delay}ms;"
     />
   `).join('');
 
-  const legend = segments.map(s => {
-    const pct = Math.round(s.frac * 100);
-    return `
-      <div class="donut-legend-item">
-        <div class="donut-dot" style="background:${s.color}"></div>
-        <span class="donut-lbl">${esc(s.label)}</span>
-        <span class="donut-cnt">${pct}% <span style="opacity:.5;font-size:11px;font-weight:400;">(${s.count})</span></span>
-      </div>
-    `;
-  }).join('');
+  const legend = segments.map(s => `
+    <div class="donut-legend-item">
+      <div class="donut-dot" style="background:${s.color}"></div>
+      <span class="donut-lbl">${esc(s.label)}</span>
+      <span class="donut-cnt">${s.pct}% <span class="donut-cnt-small">(${s.count})</span></span>
+    </div>
+  `).join('');
 
   return `
-    <div class="pizza-chart-wrap">
-      <div class="pizza-chart-stage">
-        <svg viewBox="0 0 240 240" class="pizza-chart-svg" aria-label="Pizza style breakdown">
+    <div class="style-breakdown-chart">
+      <div class="style-ring-wrap">
+        <svg viewBox="0 0 240 240" class="style-ring-svg" aria-label="Pizza style breakdown chart">
           <defs>
-            <filter id="pizzaDonutShadow" x="-25%" y="-25%" width="150%" height="150%">
-              <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="rgba(0,0,0,0.34)"/>
+            <filter id="styleRingGlow" x="-25%" y="-25%" width="150%" height="150%">
+              <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="rgba(0,0,0,0.34)"/>
             </filter>
+            <radialGradient id="styleRingCenter" cx="50%" cy="35%" r="70%">
+              <stop offset="0%" stop-color="rgba(255,255,255,0.045)"/>
+              <stop offset="100%" stop-color="rgba(0,0,0,0.12)"/>
+            </radialGradient>
           </defs>
-
-          <circle class="pizza-donut-shadow" cx="${cx}" cy="${cy}" r="${outerR}" />
-          <circle class="pizza-donut-crust" cx="${cx}" cy="${cy}" r="${outerR + 5}" />
-          <g filter="url(#pizzaDonutShadow)">
-            ${slicesSvg}
+          <circle class="style-ring-track" cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke-width="${stroke}" />
+          <g filter="url(#styleRingGlow)">
+            ${rings}
           </g>
-          <circle class="pizza-donut-inner-ring" cx="${cx}" cy="${cy}" r="${innerR + 2}" />
-          <circle class="pizza-donut-center" cx="${cx}" cy="${cy}" r="${innerR - 3}" />
-          <text class="pizza-donut-total" x="${cx}" y="${cy - 2}" text-anchor="middle">${totalPies}</text>
-          <text class="pizza-donut-label" x="${cx}" y="${cy + 18}" text-anchor="middle">Pizzas</text>
+          <circle class="style-ring-inner" cx="${cx}" cy="${cy}" r="46" />
+          <circle class="style-ring-inner-highlight" cx="${cx}" cy="${cy}" r="39" fill="url(#styleRingCenter)" />
+          <text x="${cx}" y="${cy - 2}" class="style-ring-total" text-anchor="middle">${totalPies}</text>
+          <text x="${cx}" y="${cy + 23}" class="style-ring-label" text-anchor="middle">PIZZAS</text>
         </svg>
       </div>
       <div class="donut-legend">${legend}</div>

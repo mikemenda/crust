@@ -1822,129 +1822,126 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
 .place-detail-title-group .place-detail-name { margin-bottom: 4px; }
 .place-detail-title-group .place-detail-location { margin-bottom: 0; }
 
-/* ── PIZZA CHART — Animated slices ──────────────────────────── */
-.pizza-slice-group {
-  opacity: 0;
-  transform-origin: center;
-  animation: pizzaSliceIn 550ms cubic-bezier(.2,.9,.2,1) forwards;
-  animation-delay: var(--delay, 0ms);
-  transition:
-    transform 220ms ease,
-    filter 220ms ease;
-}
-.pizza-slice-group:hover {
-  transform:
-    translate(var(--tx, 0), var(--ty, 0))
-    scale(1.04);
-}
-.pizza-slice-main {
-  transition:
-    filter 220ms ease,
-    transform 220ms ease;
-}
-.pizza-chart-svg:hover .pizza-slice-main {
-  filter: brightness(1.03);
-}
-@keyframes pizzaSliceIn {
-  0% {
-    opacity: 0;
-    transform: scale(.6) rotate(-10deg);
-  }
-  70% {
-    opacity: 1;
-    transform: scale(1.04) rotate(2deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-  }
-}
-
-
-/* ── PASSPORT STYLE BREAKDOWN — centered pizza-inspired donut ── */
-.pizza-chart-wrap {
-  width: 100%;
+/* ── PASSPORT — Style Breakdown Chart ─────────────────────── */
+.style-breakdown-chart {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 18px;
-  padding: 2px 0 4px;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  padding: 8px 0 6px;
 }
 
-.pizza-chart-stage {
+.style-ring-wrap {
   width: 100%;
-  min-height: 216px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  padding: 2px 0 0;
 }
 
-.pizza-chart-svg {
-  width: min(230px, 78vw);
+.style-ring-svg {
+  width: min(245px, 72vw);
   height: auto;
   display: block;
   overflow: visible;
 }
 
-.pizza-donut-shadow {
-  fill: rgba(0,0,0,0.16);
-  transform: translateY(8px);
+.style-ring-track {
+  stroke: rgba(240,234,214,.055);
 }
 
-.pizza-donut-crust {
-  fill: none;
-  stroke: rgba(200,169,126,0.58);
-  stroke-width: 10;
-  stroke-linecap: round;
-}
-
-.pizza-donut-slice {
+.style-ring-segment {
   opacity: 0;
-  transform-origin: 120px 120px;
-  animation: pizzaDonutIn 520ms cubic-bezier(.2,.9,.2,1) forwards;
+  stroke-linecap: butt;
+  animation: styleRingIn 700ms cubic-bezier(.2,.9,.2,1) forwards;
   animation-delay: var(--delay, 0ms);
 }
 
-.pizza-donut-inner-ring {
-  fill: none;
-  stroke: rgba(20,20,20,0.95);
-  stroke-width: 7;
-}
-
-.pizza-donut-center {
-  fill: #1C1C1C;
-  stroke: rgba(240,234,214,0.08);
+.style-ring-inner {
+  fill: #191919;
+  stroke: rgba(240,234,214,.075);
   stroke-width: 1;
 }
 
-.pizza-donut-total {
+.style-ring-inner-highlight {
+  stroke: rgba(200,169,126,.10);
+  stroke-width: 1;
+}
+
+.style-ring-total {
   fill: var(--cream);
   font-family: var(--font);
-  font-size: 30px;
-  font-weight: 200;
-  letter-spacing: -0.5px;
+  font-size: 34px;
+  font-weight: 250;
+  letter-spacing: -1px;
   dominant-baseline: middle;
 }
 
-.pizza-donut-label {
-  fill: rgba(240,234,214,0.42);
+.style-ring-label {
+  fill: rgba(240,234,214,.38);
   font-family: var(--font);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
-  dominant-baseline: middle;
+  letter-spacing: 2.2px;
 }
 
-@keyframes pizzaDonutIn {
+.donut-legend {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 0 4px;
+}
+
+.donut-legend-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--cream);
+}
+
+.donut-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.025);
+}
+
+.donut-lbl {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 450;
+  color: rgba(240,234,214,.92);
+}
+
+.donut-cnt {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--amber);
+  letter-spacing: .15px;
+}
+
+.donut-cnt-small {
+  opacity: .45;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+@keyframes styleRingIn {
   0% {
     opacity: 0;
-    transform: scale(.86);
+    stroke-dashoffset: 0;
+    filter: saturate(.8) brightness(.9);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    filter: none;
   }
 }
 
