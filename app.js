@@ -2081,7 +2081,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     styleRatings[style].count++;
     styleRatings[style].total += Number(v.rating);
   }));
-  const topRatedStyle = bestByAverage(styleRatings);
+  const topRatedStyle = bestByAverage(styleRatings, 3);
 
   const cityRatings = {};
   ratedVisits.forEach(v => {
@@ -2091,10 +2091,19 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     cityRatings[city].count++;
     cityRatings[city].total += Number(v.rating);
   });
-  const topRatedCity = bestByAverage(cityRatings);
+  const topRatedCity = bestByAverage(cityRatings, 3);
+
+  const countryRatings = {};
+  ratedVisits.forEach(v => {
+    const country = (v.country || '').trim();
+    if (!country) return;
+    if (!countryRatings[country]) countryRatings[country] = { label: country, count: 0, total: 0 };
+    countryRatings[country].count++;
+    countryRatings[country].total += Number(v.rating);
+  });
+  const topRatedCountry = bestByAverage(countryRatings, 3);
 
   const explorerPct = pies ? Math.round((spots / pies) * 100) : 0;
-  const perfectCount = ratedVisits.filter(v => Number(v.rating) === 10).length;
 
   // Top rated places / Hall of Fame
   const ratedPlaces = places
@@ -2146,13 +2155,16 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     const yCities = new Set(yearVisits.map(v => v.city).filter(Boolean)).size;
     const yCountries = new Set(yearVisits.map(v => v.country).filter(Boolean)).size;
 
-    const yPlaceCount = {};
-    yearVisits.forEach(v => {
-      if (!v.placeId) return;
-      if (!yPlaceCount[v.placeId]) yPlaceCount[v.placeId] = { count: 0, name: v.placeName || 'Unknown' };
-      yPlaceCount[v.placeId].count++;
+    const yPlaceRatings = {};
+    yearVisits.filter(v => v.rating != null && !isNaN(Number(v.rating))).forEach(v => {
+      const key = v.placeId || v.placeName || 'unknown';
+      if (!yPlaceRatings[key]) yPlaceRatings[key] = { count: 0, name: v.placeName || 'Unknown', total: 0 };
+      yPlaceRatings[key].count++;
+      yPlaceRatings[key].total += Number(v.rating);
     });
-    const yTopSpot = Object.values(yPlaceCount).sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name)))[0] || null;
+    const yTopSpot = Object.values(yPlaceRatings)
+      .map(x => ({ ...x, avg: x.total / x.count }))
+      .sort((a, b) => (b.avg - a.avg) || (b.count - a.count) || String(a.name).localeCompare(String(b.name)))[0] || null;
 
     const yStyleRatings = {};
     yearVisits.filter(v => v.rating != null && !isNaN(Number(v.rating))).forEach(v => (v.styles || []).forEach(style => {
@@ -2198,7 +2210,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedStyle ? esc(topRatedStyle.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated Style</div>
-        <div class="pp-insight-sub">${topRatedStyle ? `Avg: ${scoreLabel(topRatedStyle.avg)} · Pies: ${topRatedStyle.count}` : 'No style ratings yet'}</div>
+        <div class="pp-insight-sub">${topRatedStyle ? `Avg: ${scoreLabel(topRatedStyle.avg)} · Pies: ${topRatedStyle.count}` : 'Need 3 rated pies'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${ratedVisits.length ? scoreLabel(avgLife) : '—'}</div>
@@ -2208,7 +2220,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedCity ? esc(topRatedCity.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated City</div>
-        <div class="pp-insight-sub">${topRatedCity ? `Avg: ${scoreLabel(topRatedCity.avg)} · Pies: ${topRatedCity.count}` : 'No city ratings yet'}</div>
+        <div class="pp-insight-sub">${topRatedCity ? `Avg: ${scoreLabel(topRatedCity.avg)} · Pies: ${topRatedCity.count}` : 'Need 3 rated pies'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${explorerPct}%</div>
@@ -2216,14 +2228,14 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
         <div class="pp-insight-sub">${spots}/${pies} unique spots</div>
       </div>
       <div class="pp-insight-card">
-        <div class="pp-insight-value pp-insight-name">${repeatFavorite ? esc(repeatFavorite.name || 'Unknown') : '—'}</div>
-        <div class="pp-insight-label">Repeat Favorite</div>
-        <div class="pp-insight-sub">${repeatFavorite ? plural(repeatFavorite.visitCount || 0, 'visit') : 'No repeats yet'}</div>
+        <div class="pp-insight-value pp-insight-name">${topRatedCountry ? esc(topRatedCountry.label) : '—'}</div>
+        <div class="pp-insight-label">Top Rated Country</div>
+        <div class="pp-insight-sub">${topRatedCountry ? `Avg: ${scoreLabel(topRatedCountry.avg)} · Pies: ${topRatedCountry.count}` : 'Need 3 rated pies'}</div>
       </div>
       <div class="pp-insight-card">
-        <div class="pp-insight-value">${styleData.length}</div>
-        <div class="pp-insight-label">Styles Tried</div>
-        <div class="pp-insight-sub">${plural(styleData.length, 'style')} logged</div>
+        <div class="pp-insight-value">${repeatFavorite ? (repeatFavorite.visitCount || 0) : '—'}</div>
+        <div class="pp-insight-label">Repeat Favorite</div>
+        <div class="pp-insight-sub">${repeatFavorite ? esc(repeatFavorite.name || 'Unknown') : 'No repeats yet'}</div>
       </div>
     </div>
 
@@ -2243,7 +2255,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
             <div class="pp-rank-name">${esc(p.name || 'Unknown')}</div>
             <div class="pp-rank-sub">${esc(cleanMeta(loc, plural(p.ratingHistory?.length || 0, 'visit')))}</div>
           </div>
-          <div class="pp-rank-score">${scoreLabel(p.avg)}</div>
+          <div class="pp-rank-score-wrap"><div class="pp-rank-score">${scoreLabel(p.avg)}</div><span>avg</span></div>
         </div>`;
       }).join('')}
     </div>
@@ -2295,23 +2307,23 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
 
 function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (n, word) => `${n} ${word}${Number(n) === 1 ? '' : 's'}`) {
   if (!data) return '';
-  const year = data.year;
   const topSpot = data.topSpot;
   const topStyle = data.topStyle;
+  const snapshot = `${data.visits.length} ${data.visits.length === 1 ? 'pie' : 'pies'} · ${data.spots} ${data.spots === 1 ? 'spot' : 'spots'} · ${data.cities} ${data.cities === 1 ? 'city' : 'cities'} · ${data.countries} ${data.countries === 1 ? 'country' : 'countries'}`;
   return `
     <div class="pp-yir-card pp-yir-full pp-yir-snapshot">
-      <div class="pp-yir-value">${year} Snapshot</div>
-      <div class="pp-yir-label">Year in Review</div>
-      <div class="pp-yir-sub">${data.visits.length} pies · ${data.spots} spots · ${data.cities} cities · ${data.countries} countries</div>
+      <div class="pp-yir-value pp-yir-name">${snapshot}</div>
+      <div class="pp-yir-label">Snapshot</div>
+      <div class="pp-yir-sub">Year in Review</div>
     </div>
     <div class="pp-yir-card pp-yir-full">
       <div class="pp-yir-value pp-yir-name">${topSpot ? esc(topSpot.name) : '—'}</div>
-      <div class="pp-yir-label">${year} Top Spot</div>
-      <div class="pp-yir-sub">${topSpot ? `${topSpot.count} ${topSpot.count === 1 ? 'visit' : 'visits'} this year` : 'No visits logged this year'}</div>
+      <div class="pp-yir-label">Top Rated Spot</div>
+      <div class="pp-yir-sub">${topSpot ? `Avg: ${scoreLabel(topSpot.avg)} · Visits: ${topSpot.count}` : 'No rated spots this year'}</div>
     </div>
     <div class="pp-yir-card pp-yir-full">
       <div class="pp-yir-value pp-yir-name">${topStyle ? esc(topStyle.label) : '—'}</div>
-      <div class="pp-yir-label">${year} Top Rated Style</div>
+      <div class="pp-yir-label">Top Rated Style</div>
       <div class="pp-yir-sub">${topStyle ? `Avg: ${scoreLabel(topStyle.avg)} · Pies: ${topStyle.count}` : 'No style ratings this year'}</div>
     </div>
   `;

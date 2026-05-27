@@ -2433,3 +2433,102 @@ textarea.form-input {
 #screen-passport .pp-rank-list--compact .pp-rank-row:nth-child(n+6) {
   display: none !important;
 }
+
+
+/* ============================================================
+   CRUST — Passport V49 Final Stats Hierarchy
+   Focus: centered lifetime streak, six-card taste profile,
+   Hall of Fame avg labels, clearer Year in Review answers.
+   ============================================================ */
+
+#screen-passport .stat-card.streak {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 10px !important;
+  text-align: left !important;
+}
+
+#screen-passport .stat-card.streak .streak-icon {
+  flex: 0 0 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+}
+
+#screen-passport .stat-card.streak .streak-num {
+  flex: 0 0 auto !important;
+  font-size: 30px !important;
+  letter-spacing: -.6px !important;
+}
+
+#screen-passport .stat-card.streak .streak-body {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+}
+
+#screen-passport .pp-insight-sub {
+  font-size: 10.6px !important;
+  line-height: 1.25 !important;
+  letter-spacing: .01px !important;
+}
+
+#screen-passport .pp-rank-score-wrap {
+  min-width: 44px;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  color: var(--cream);
+}
+
+#screen-passport .pp-rank-score-wrap .pp-rank-score {
+  font-size: 24px !important;
+  line-height: .95 !important;
+  min-width: 0 !important;
+}
+
+#screen-passport .pp-rank-score-wrap span {
+  margin-top: 4px;
+  color: rgba(240,234,214,.38);
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-card {
+  min-height: 84px !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-value {
+  color: var(--cream);
+  font-size: 19px !important;
+  font-weight: 500 !important;
+  line-height: 1.18 !important;
+  letter-spacing: -.25px;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-snapshot .pp-yir-value {
+  font-size: 17px !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-label {
+  margin-top: 8px;
+  color: var(--amber);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-sub {
+  margin-top: 5px;
+  color: rgba(240,234,214,.44);
+  font-size: 11px;
+  line-height: 1.25;
+}
