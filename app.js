@@ -1920,123 +1920,68 @@ function renderPassportContent(visits, places, body) {
 function buildPizzaChart(styleData, totalPies) {
   const cx = 120;
   const cy = 120;
-  const r = 88;
-
+  const outerR = 82;
+  const innerR = 43;
   const total = styleData.reduce((s, d) => s + d.count, 0);
-
   const isSingle = styleData.length === 1;
 
-  // Slight global rotation for a more natural feel
-  let angle = -Math.PI / 2 + 0.14;
-
-  // REAL angular gap instead of relying on stroke
-  const gap = isSingle ? 0 : 0.075;
+  let angle = -Math.PI / 2;
+  const gap = isSingle ? 0 : 0.018;
 
   function polar(radius, a) {
     return {
-      x: +(radius * Math.cos(a)).toFixed(2),
-      y: +(radius * Math.sin(a)).toFixed(2)
+      x: +(cx + radius * Math.cos(a)).toFixed(2),
+      y: +(cy + radius * Math.sin(a)).toFixed(2)
     };
   }
 
-  function arcPath(sa, ea, radius) {
-    const p1 = polar(radius, sa);
-    const p2 = polar(radius, ea);
-    const largeArc = ea - sa > Math.PI ? 1 : 0;
+  function donutSlicePath(sa, ea) {
+    const outerStart = polar(outerR, sa);
+    const outerEnd   = polar(outerR, ea);
+    const innerEnd   = polar(innerR, ea);
+    const innerStart = polar(innerR, sa);
+    const largeArc   = ea - sa > Math.PI ? 1 : 0;
 
     return `
-      M 0 0
-      L ${p1.x} ${p1.y}
-      A ${radius} ${radius} 0 ${largeArc} 1 ${p2.x} ${p2.y}
+      M ${outerStart.x} ${outerStart.y}
+      A ${outerR} ${outerR} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}
+      L ${innerEnd.x} ${innerEnd.y}
+      A ${innerR} ${innerR} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}
       Z
     `;
   }
 
   const segments = styleData.map((d, i) => {
     const frac = d.count / total;
-
     const rawStart = angle;
     const rawEnd = angle + frac * Math.PI * 2;
 
-    const sa = rawStart + gap;
-    const ea = rawEnd - gap;
-
-    const mid = (sa + ea) / 2;
+    // Keep tiny slices visible while still preserving a clean separation.
+    const available = rawEnd - rawStart;
+    const sliceGap = Math.min(gap, Math.max(0, available * 0.18));
+    const sa = rawStart + sliceGap;
+    const ea = rawEnd - sliceGap;
 
     angle = rawEnd;
-
-    // Bigger slices push out slightly more
-    const explode = isSingle
-      ? 0
-      : 10 + frac * 14;
-
-    const tx = +(explode * Math.cos(mid)).toFixed(2);
-    const ty = +(explode * Math.sin(mid)).toFixed(2);
-
-    const basePath = arcPath(sa, ea, r);
 
     return {
       label: d.label,
       count: d.count,
       frac,
       color: STYLE_COLORS[d.label] || '#777',
-      path: basePath,
-      tx,
-      ty,
-      delay: i * 45
+      path: donutSlicePath(sa, ea),
+      delay: i * 42
     };
   });
 
-  const slicesSvg = isSingle
-    ? `
-      <g class="pizza-slice-group">
-        <circle
-          cx="${cx}"
-          cy="${cy}"
-          r="${r}"
-          fill="${segments[0].color}"
-          filter="url(#pizzaShadow)"
-        />
-        <circle
-          cx="${cx}"
-          cy="${cy}"
-          r="${r - 8}"
-          fill="rgba(255,255,255,0.06)"
-          style="mix-blend-mode:soft-light;"
-        />
-      </g>
-    `
-    : segments.map(s => `
-      <g
-        class="pizza-slice-group"
-        style="--delay:${s.delay}ms;"
-        transform="translate(${cx + s.tx}, ${cy + s.ty})"
-      >
-        <path
-          d="${s.path}"
-          fill="rgba(0,0,0,0.38)"
-          transform="translate(0 6)"
-          filter="url(#blur)"
-        />
-        <path
-          class="pizza-slice-main"
-          d="${s.path}"
-          fill="${s.color}"
-          filter="url(#pizzaShadow)"
-        />
-        <path
-          d="${s.path}"
-          fill="rgba(255,255,255,0.08)"
-          style="mix-blend-mode:soft-light;"
-          transform="scale(.96)"
-        />
-        <path
-          d="${s.path}"
-          fill="rgba(0,0,0,0.10)"
-          transform="scale(.88)"
-        />
-      </g>
-    `).join('');
+  const slicesSvg = segments.map(s => `
+    <path
+      class="pizza-donut-slice"
+      d="${s.path}"
+      fill="${s.color}"
+      style="--delay:${s.delay}ms;"
+    />
+  `).join('');
 
   const legend = segments.map(s => {
     const pct = Math.round(s.frac * 100);
@@ -2050,20 +1995,27 @@ function buildPizzaChart(styleData, totalPies) {
   }).join('');
 
   return `
-    <div style="display:flex;flex-direction:column;align-items:center;gap:26px;padding:10px 0 8px;">
-      <svg viewBox="-60 -60 360 360" width="100%" style="max-width:300px;display:block;margin:0 auto;" class="pizza-chart-svg">
-        <defs>
-          <filter id="pizzaShadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.38)"/>
-          </filter>
-          <filter id="blur">
-            <feGaussianBlur stdDeviation="4"/>
-          </filter>
-        </defs>
-        ${slicesSvg}
-        ${isSingle ? '' : `<circle cx="${cx}" cy="${cy}" r="6" fill="rgba(20,20,20,0.95)"/>`}
-      </svg>
-      <div class="donut-legend" style="width:100%;padding:0 4px;">${legend}</div>
+    <div class="pizza-chart-wrap">
+      <div class="pizza-chart-stage">
+        <svg viewBox="0 0 240 240" class="pizza-chart-svg" aria-label="Pizza style breakdown">
+          <defs>
+            <filter id="pizzaDonutShadow" x="-25%" y="-25%" width="150%" height="150%">
+              <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="rgba(0,0,0,0.34)"/>
+            </filter>
+          </defs>
+
+          <circle class="pizza-donut-shadow" cx="${cx}" cy="${cy}" r="${outerR}" />
+          <circle class="pizza-donut-crust" cx="${cx}" cy="${cy}" r="${outerR + 5}" />
+          <g filter="url(#pizzaDonutShadow)">
+            ${slicesSvg}
+          </g>
+          <circle class="pizza-donut-inner-ring" cx="${cx}" cy="${cy}" r="${innerR + 2}" />
+          <circle class="pizza-donut-center" cx="${cx}" cy="${cy}" r="${innerR - 3}" />
+          <text class="pizza-donut-total" x="${cx}" y="${cy - 2}" text-anchor="middle">${totalPies}</text>
+          <text class="pizza-donut-label" x="${cx}" y="${cy + 18}" text-anchor="middle">Pizzas</text>
+        </svg>
+      </div>
+      <div class="donut-legend">${legend}</div>
     </div>
   `;
 }

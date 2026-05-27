@@ -1860,6 +1860,94 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   }
 }
 
+
+/* ── PASSPORT STYLE BREAKDOWN — centered pizza-inspired donut ── */
+.pizza-chart-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  padding: 2px 0 4px;
+}
+
+.pizza-chart-stage {
+  width: 100%;
+  min-height: 216px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.pizza-chart-svg {
+  width: min(230px, 78vw);
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.pizza-donut-shadow {
+  fill: rgba(0,0,0,0.16);
+  transform: translateY(8px);
+}
+
+.pizza-donut-crust {
+  fill: none;
+  stroke: rgba(200,169,126,0.58);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.pizza-donut-slice {
+  opacity: 0;
+  transform-origin: 120px 120px;
+  animation: pizzaDonutIn 520ms cubic-bezier(.2,.9,.2,1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+.pizza-donut-inner-ring {
+  fill: none;
+  stroke: rgba(20,20,20,0.95);
+  stroke-width: 7;
+}
+
+.pizza-donut-center {
+  fill: #1C1C1C;
+  stroke: rgba(240,234,214,0.08);
+  stroke-width: 1;
+}
+
+.pizza-donut-total {
+  fill: var(--cream);
+  font-family: var(--font);
+  font-size: 30px;
+  font-weight: 200;
+  letter-spacing: -0.5px;
+  dominant-baseline: middle;
+}
+
+.pizza-donut-label {
+  fill: rgba(240,234,214,0.42);
+  font-family: var(--font);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  dominant-baseline: middle;
+}
+
+@keyframes pizzaDonutIn {
+  0% {
+    opacity: 0;
+    transform: scale(.86);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* ── GLOBE TEASER CARD (Home) ────────────────────────────────── */
 #home-globe-section { /* always shown */ }
 
