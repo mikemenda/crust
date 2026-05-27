@@ -1749,6 +1749,52 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ── Log Screen — swipe-down to dismiss ───────────────────────
+// Drag down on the log header to close. Works even when the
+// log scroll area is at the top. Uses translateY on the whole
+// screen so it feels like a native sheet being pulled away.
+(function() {
+  const logScreen = document.getElementById('screen-log');
+  const logHeader = logScreen?.querySelector('.log-header');
+  if (!logScreen || !logHeader) return;
+
+  let startY = 0, tracking = false;
+
+  logHeader.addEventListener('touchstart', e => {
+    startY    = e.touches[0].clientY;
+    tracking  = true;
+    logScreen.style.transition = 'none';
+  }, { passive: true });
+
+  logHeader.addEventListener('touchmove', e => {
+    if (!tracking) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) { tracking = false; logScreen.style.transform = ''; return; }
+    e.preventDefault();
+    logScreen.style.transform = `translateY(${Math.min(dy, 320)}px)`;
+  }, { passive: false });
+
+  logHeader.addEventListener('touchend', e => {
+    if (!tracking) return;
+    tracking = false;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (dy > 88) {
+      // Fly off screen then navigate home
+      logScreen.style.transition = 'transform 0.22s ease';
+      logScreen.style.transform  = 'translateY(100%)';
+      setTimeout(() => {
+        logScreen.style.transition = '';
+        logScreen.style.transform  = '';
+        navigate('home');
+      }, 230);
+    } else {
+      // Snap back
+      logScreen.style.transition = 'transform 0.28s cubic-bezier(.25,.46,.45,.94)';
+      logScreen.style.transform  = '';
+    }
+  });
+})();
+
 // ── Helpers ───────────────────────────────────────────────────
 function esc(s) {
   if (!s) return '';

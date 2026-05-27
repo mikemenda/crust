@@ -487,15 +487,30 @@ input, textarea, select { font-family: var(--font); }
 .nav-fab:active { transform: scale(.91); box-shadow: 0 2px 10px rgba(216,90,48,.25); }
 
 /* ── LOG SCREEN ──────────────────────────────────────────────── */
+/* Hide bottom nav when logging — prevents accidental nav tap */
+#screen-log.active ~ .bottom-nav { display: none; }
+
 .log-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(var(--safe-top) + 16px) 20px 20px;
+  padding: calc(var(--safe-top) + 24px) 20px 20px;
   position: sticky;
   top: 0;
   background: var(--bg);
   z-index: 100;
+  position: relative; /* for drag bar */
+}
+.log-drag-bar {
+  position: absolute;
+  top: calc(var(--safe-top) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  background: rgba(240,234,214,0.18);
+  border-radius: 2px;
+  pointer-events: none;
 }
 .log-title {
   font-size: 18px;
@@ -2221,4 +2236,19 @@ input[type="range"].rating-slider::-webkit-slider-thumb {
   height: 42px;
   background: var(--cream-12);
   flex-shrink: 0;
+}
+
+/* ── PASSPORT — CENTERED LIFETIME STAT CARDS ─────────────────── */
+#screen-passport .stat-card {
+  text-align: center;
+  align-items: center;
+}
+#screen-passport .stat-card.streak {
+  text-align: left;
+  align-items: center;
+}
+
+/* ── LOG SCREEN — SWIPE-DOWN SLIDE TRANSITION ───────────────── */
+#screen-log {
+  will-change: transform;
 }
