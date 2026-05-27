@@ -637,20 +637,28 @@
         <span class="wordmark" style="font-size:15px;letter-spacing:2.5px;">Feed</span>
       </div>
     </header>
-    <!-- Filter + Sort side by side -->
+    <!-- Feed tools -->
+    <div class="feed-hero">
+      <div>
+        <div class="feed-hero-title">Pizza memories</div>
+        <div class="feed-count" id="feed-count">0 photos</div>
+      </div>
+    </div>
+
     <div class="feed-controls">
       <div class="feed-control-row" id="feed-filters-row" style="display:none;">
         <span class="feed-control-label">Filter</span>
         <div class="feed-control-pills" id="feed-filters"></div>
       </div>
-      <div class="feed-control-row" style="margin-left:auto;">
+      <div class="feed-control-row feed-sort-control">
         <span class="feed-control-label">Sort</span>
         <div class="feed-control-pills" id="feed-sort-row">
-          <button class="filter-pill active" data-sort="date" onclick="setFeedSort('date')">Date</button>
-          <button class="filter-pill" data-sort="rating" onclick="setFeedSort('rating')">Rating</button>
+          <button class="filter-pill feed-pill active" data-sort="date" onclick="setFeedSort('date')">Date</button>
+          <button class="filter-pill feed-pill" data-sort="rating" onclick="setFeedSort('rating')">Rating</button>
         </div>
       </div>
     </div>
+
     <!-- 3-col photo grid -->
     <div class="feed-grid" id="feed-grid"></div>
   </div>

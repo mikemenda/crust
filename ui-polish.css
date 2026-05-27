@@ -2711,3 +2711,432 @@ textarea.form-input {
     font-size: 13.7px !important;
   }
 }
+
+
+/* ============================================================
+   CRUST — Feed Overhaul V53
+   Scope: Feed landing gallery, feed filters/sort, opened photo feed.
+   ============================================================ */
+
+#screen-feed {
+  background: var(--bg);
+}
+
+#screen-feed .app-header {
+  padding-bottom: 10px;
+}
+
+#screen-feed .btn-icon[aria-label="Back"] {
+  width: 36px;
+  height: 36px;
+  background: rgba(240,234,214,.055);
+  border: 1px solid rgba(240,234,214,.055);
+  color: rgba(240,234,214,.56) !important;
+}
+
+.feed-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 16px 10px;
+}
+
+.feed-hero-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .2px;
+  color: rgba(240,234,214,.82);
+}
+
+.feed-count {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: rgba(240,234,214,.38);
+  letter-spacing: .15px;
+}
+
+.feed-controls {
+  padding: 0 16px 12px !important;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.feed-control-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.feed-sort-control {
+  margin-left: auto;
+}
+
+.feed-control-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.45px;
+  text-transform: uppercase;
+  color: var(--amber);
+  opacity: .92;
+  white-space: nowrap;
+}
+
+.feed-control-pills {
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.feed-pill.filter-pill {
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(240,234,214,.045);
+  border: 1px solid rgba(240,234,214,.065);
+  color: rgba(240,234,214,.55);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .05px;
+}
+
+.feed-pill.filter-pill.active {
+  background: rgba(200,169,126,.15);
+  border-color: rgba(200,169,126,.8);
+  color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(200,169,126,.045);
+}
+
+.feed-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px !important;
+  padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 16px) !important;
+}
+
+.feed-loading {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.feed-cell {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: 1px solid rgba(240,234,214,.045);
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(240,234,214,.045), rgba(240,234,214,.015));
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  color: inherit;
+}
+
+.feed-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scale(1.01);
+  transition: transform .18s ease, opacity .18s ease;
+}
+
+.feed-cell:active img {
+  opacity: .78;
+  transform: scale(1.035);
+}
+
+.feed-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,.58), rgba(0,0,0,0) 52%);
+  opacity: 0;
+  transition: opacity .18s ease;
+  pointer-events: none;
+}
+
+.feed-cell-overlay {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}
+
+.feed-cell:active::after,
+.feed-cell:active .feed-cell-overlay {
+  opacity: 1;
+}
+
+.feed-cell:active .feed-cell-overlay {
+  transform: translateY(0);
+}
+
+.feed-cell-title {
+  font-size: 11.5px;
+  line-height: 1.05;
+  font-weight: 700;
+  color: var(--cream);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.feed-cell-meta {
+  margin-top: 2px;
+  font-size: 9.5px;
+  color: rgba(240,234,214,.62);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.feed-cell-tag {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  max-width: calc(100% - 14px);
+  padding: 2px 7px 2.5px;
+  border-radius: 999px;
+  background: rgba(20,20,20,.58);
+  border: 1px solid rgba(240,234,214,.06);
+  color: rgba(240,234,214,.78);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.feed-cell-fallback {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: rgba(200,169,126,.72);
+}
+
+.feed-cell.image-error .feed-cell-fallback {
+  display: flex;
+}
+
+.feed-empty {
+  min-height: 48vh;
+  border: 1px solid rgba(240,234,214,.06);
+  border-radius: 22px;
+  background: rgba(240,234,214,.025);
+}
+
+/* Feed photo overlay — polished vertical memory feed */
+.feed-photo-overlay {
+  background: #090909;
+  z-index: 760;
+}
+
+.ifeed-topbar {
+  min-height: calc(var(--safe-top) + 56px);
+  padding: calc(var(--safe-top) + 10px) 18px 10px;
+  background: rgba(9,9,9,.96);
+  border-bottom: 1px solid rgba(240,234,214,.055);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.ifeed-topbar .btn-icon {
+  width: 36px;
+  height: 36px;
+  background: rgba(240,234,214,.07);
+  border: 1px solid rgba(240,234,214,.055);
+  color: rgba(240,234,214,.82);
+}
+
+.ifeed-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--safe-bottom) + 18px);
+  scroll-snap-type: y proximity;
+}
+
+.ifeed-post {
+  border-bottom: 1px solid rgba(240,234,214,.065);
+  scroll-snap-align: start;
+  background: #090909;
+}
+
+.ifeed-photo-wrap {
+  position: relative;
+  width: 100%;
+  max-height: min(62vh, 560px);
+  min-height: 260px;
+  background: linear-gradient(145deg, rgba(240,234,214,.045), rgba(240,234,214,.012));
+  overflow: hidden;
+}
+
+.ifeed-photo {
+  width: 100%;
+  height: auto;
+  max-height: min(62vh, 560px);
+  min-height: 260px;
+  object-fit: cover;
+  display: block;
+}
+
+.ifeed-photo-fallback {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: rgba(200,169,126,.72);
+}
+
+.ifeed-photo-wrap.image-error .ifeed-photo-fallback {
+  display: flex;
+}
+
+.ifeed-meta {
+  padding: 16px 18px 22px;
+  background: #090909;
+}
+
+.ifeed-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.ifeed-rating {
+  font-size: 28px;
+  font-weight: 250;
+  line-height: 1;
+  color: var(--amber);
+  letter-spacing: -.5px;
+}
+
+.ifeed-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 68%;
+}
+
+.ifeed-tags .style-tag {
+  font-size: 9px;
+  padding: 3px 9px 3.5px;
+  background: rgba(200,169,126,.15);
+  color: var(--amber);
+}
+
+.ifeed-place {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--cream);
+  line-height: 1.15;
+  margin-bottom: 5px;
+}
+
+.ifeed-subline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(240,234,214,.45);
+  margin-bottom: 0;
+}
+
+.ifeed-dot {
+  color: rgba(240,234,214,.24);
+}
+
+.ifeed-notes {
+  margin-top: 13px;
+  font-size: 13.5px;
+  color: rgba(240,234,214,.68);
+  line-height: 1.48;
+  white-space: pre-wrap;
+  padding: 12px 14px;
+  background: rgba(240,234,214,.035);
+  border: 1px solid rgba(240,234,214,.045);
+  border-radius: 16px;
+}
+
+.ifeed-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.ifeed-view-entry {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--amber);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .1px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.ifeed-position {
+  font-size: 11px;
+  color: rgba(240,234,214,.28);
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .feed-controls {
+    gap: 8px;
+  }
+
+  .feed-pill.filter-pill {
+    min-height: 32px;
+    padding: 6px 11px;
+    font-size: 12px;
+  }
+
+  .feed-grid {
+    gap: 4px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  .feed-cell {
+    border-radius: 14px;
+  }
+
+  .ifeed-place {
+    font-size: 17px;
+  }
+}
+

@@ -2526,71 +2526,160 @@ async function loadFeed() {
   if (!currentUser) return;
   const grid = document.getElementById('feed-grid');
   if (!grid) return;
-  grid.innerHTML = '<div style="grid-column:1/-1;padding:48px;text-align:center;opacity:.35;font-size:14px;">Loading…</div>';
+
+  grid.innerHTML = `
+    <div class="feed-loading" style="grid-column:1/-1;">
+      <div class="skel" style="height:110px;border-radius:18px;"></div>
+      <div class="skel" style="height:110px;border-radius:18px;"></div>
+      <div class="skel" style="height:110px;border-radius:18px;"></div>
+    </div>`;
 
   try {
     const snap = await db.collection(`users/${currentUser.uid}/visits`)
       .orderBy('date', 'desc')
       .get();
-    _feedVisits = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.photoUrl);
 
-    _feedFilterOpts.cities = [...new Set(_feedVisits.map(v => v.city).filter(Boolean))].sort();
+    _feedVisits = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(v => v.photoUrl);
+
+    _feedFilterOpts.cities = [...new Set(_feedVisits.map(v => (v.city || '').trim()).filter(Boolean))].sort();
     _feedFilterOpts.styles = [...new Set(_feedVisits.flatMap(v => v.styles || []))].sort();
+
     _feedFilters = { city: '', style: '' };
 
     renderFeedFilterPills();
+    renderFeedSortPills();
     renderFeedGrid();
-    // Sync sort pills to current state
-    document.querySelectorAll('#feed-sort-row .filter-pill').forEach(p =>
-      p.classList.toggle('active', p.dataset.sort === _feedSort));
-    // Open a specific photo if navigated here from the Home strip
+
     if (_pendingFeedOpenId) {
       openFeedPhoto(_pendingFeedOpenId);
       _pendingFeedOpenId = null;
     }
   } catch (e) {
     console.error('loadFeed:', e);
-    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;padding:48px;text-align:center;opacity:.35;font-size:14px;">Couldn\'t load photos.</div>';
+    grid.innerHTML = `
+      <div class="empty-state feed-empty" style="grid-column:1/-1">
+        <div class="empty-icon">📷</div>
+        <div class="empty-title">Couldn’t load photos</div>
+        <div class="empty-body">Try again in a moment.</div>
+      </div>`;
   }
+}
+
+function feedDateValue(v) {
+  const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+  return isNaN(d) ? 0 : d.getTime();
+}
+
+function getFilteredFeedVisits() {
+  let visits = _feedVisits;
+
+  if (_feedFilters.city) {
+    visits = visits.filter(v => (v.city || '').trim() === _feedFilters.city);
+  }
+  if (_feedFilters.style) {
+    visits = visits.filter(v => (v.styles || []).includes(_feedFilters.style));
+  }
+
+  visits = [...visits];
+
+  if (_feedSort === 'rating') {
+    visits.sort((a, b) => {
+      const ratingDelta = (b.rating ?? -1) - (a.rating ?? -1);
+      if (ratingDelta !== 0) return ratingDelta;
+      return feedDateValue(b) - feedDateValue(a);
+    });
+  } else {
+    visits.sort((a, b) => feedDateValue(b) - feedDateValue(a));
+  }
+
+  return visits;
 }
 
 function renderFeedFilterPills() {
   const row       = document.getElementById('feed-filters');
   const filterRow = document.getElementById('feed-filters-row');
   if (!row) return;
+
   const pills = [];
   const pill = (key, label) => {
     const active = _feedFilters[key];
-    pills.push(`<button class="filter-pill ${active ? 'active' : ''}" onclick="openFeedFilter('${key}')">${active ? esc(active) : label}</button>`);
+    pills.push(`
+      <button class="filter-pill feed-pill ${active ? 'active' : ''}" onclick="openFeedFilter('${key}')">
+        ${active ? esc(active) : label}
+      </button>`);
   };
+
   if (_feedFilterOpts.cities.length > 1) pill('city',  'City');
   if (_feedFilterOpts.styles.length > 0) pill('style', 'Style');
+
   row.innerHTML = pills.join('');
   if (filterRow) filterRow.style.display = pills.length ? 'flex' : 'none';
+}
+
+function renderFeedSortPills() {
+  document.querySelectorAll('#feed-sort-row .filter-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.sort === _feedSort);
+  });
+}
+
+function setFeedSort(sort) {
+  if (!['date', 'rating'].includes(sort)) return;
+  _feedSort = sort;
+  renderFeedSortPills();
+  renderFeedGrid();
+}
+
+function feedActiveLabel() {
+  const filters = [];
+  if (_feedFilters.city) filters.push(_feedFilters.city);
+  if (_feedFilters.style) filters.push(_feedFilters.style);
+  return filters.join(' · ');
+}
+
+function renderFeedCount(visits) {
+  const count = document.getElementById('feed-count');
+  if (!count) return;
+  const total = visits.length;
+  const active = feedActiveLabel();
+  const photoLabel = total === 1 ? 'photo' : 'photos';
+  count.textContent = active ? `${total} ${photoLabel} · ${active}` : `${total} ${photoLabel}`;
 }
 
 function renderFeedGrid() {
   const grid = document.getElementById('feed-grid');
   if (!grid) return;
 
-  let visits = _feedVisits;
-  if (_feedFilters.city)  visits = visits.filter(v => v.city === _feedFilters.city);
-  if (_feedFilters.style) visits = visits.filter(v => (v.styles || []).includes(_feedFilters.style));
-  if (_feedSort === 'rating') visits = [...visits].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const visits = getFilteredFeedVisits();
+  renderFeedCount(visits);
 
   if (!visits.length) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-      <div class="empty-icon">📷</div>
-      <div class="empty-title">No photos here</div>
-      <div class="empty-body">Add photos when logging pizzas to see them here.</div>
-    </div>`;
+    grid.innerHTML = `
+      <div class="empty-state feed-empty" style="grid-column:1/-1">
+        <div class="empty-icon">📷</div>
+        <div class="empty-title">No photos here</div>
+        <div class="empty-body">Try adjusting your filters or add photos when logging pizzas.</div>
+      </div>`;
     return;
   }
 
-  grid.innerHTML = visits.map(v => `
-    <div class="feed-cell" onclick="openFeedPhoto('${v.id}')">
-      <img src="${esc(v.photoUrl)}" loading="lazy" />
-    </div>`).join('');
+  grid.innerHTML = visits.map((v) => {
+    const loc = [v.city, v.country].filter(Boolean).join(', ');
+    const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+    const dStr = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const tag = (v.styles || [])[0] || '';
+    return `
+      <button class="feed-cell" onclick="openFeedPhoto('${v.id}')" aria-label="Open ${esc(v.placeName || 'photo')}">
+        <img src="${esc(v.photoUrl)}" loading="lazy" onerror="this.closest('.feed-cell').classList.add('image-error');this.remove();" />
+        <div class="feed-cell-fallback">${pizzaPlaceholderSvg(26)}</div>
+        <div class="feed-cell-overlay">
+          <div class="feed-cell-title">${esc(v.placeName || 'Unknown')}</div>
+          <div class="feed-cell-meta">${esc(loc || dStr || '')}</div>
+        </div>
+        ${tag ? `<span class="feed-cell-tag">${esc(tag)}</span>` : ''}
+      </button>`;
+  }).join('');
 }
 
 function openFeedFilter(key) {
@@ -2635,51 +2724,67 @@ function closeFeedFilterSheet() {
 }
 
 function openFeedPhoto(id) {
-  let visits = _feedVisits;
-  if (_feedFilters.city)  visits = visits.filter(v => v.city === _feedFilters.city);
-  if (_feedFilters.style) visits = visits.filter(v => (v.styles || []).includes(_feedFilters.style));
-  if (_feedSort === 'rating') visits = [...visits].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const visits = getFilteredFeedVisits();
   _feedCurrentFilteredList = visits;
+  _feedCurrentIdx = Math.max(0, visits.findIndex(v => v.id === id));
 
   const scroll = document.getElementById('ifeed-scroll');
   if (!scroll) return;
-  scroll.innerHTML = visits.map(v => buildIFeedPost(v)).join('');
+
+  scroll.innerHTML = visits.map((v, idx) => buildIFeedPost(v, idx, visits.length)).join('');
   document.getElementById('feed-photo-overlay').classList.remove('hidden');
 
-  // Scroll to the tapped photo instantly
   requestAnimationFrame(() => {
     const target = document.getElementById(`ifeed-post-${id}`);
-    if (target) target.scrollIntoView({ behavior: 'instant', block: 'start' });
+    if (target) target.scrollIntoView({ behavior: 'auto', block: 'start' });
   });
 }
 
-function buildIFeedPost(v) {
+function buildIFeedPost(v, idx = 0, total = 0) {
   const d    = v.date?.toDate ? v.date.toDate() : new Date(v.date);
   const dStr = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const loc  = [v.city, v.country].filter(Boolean).join(', ');
   const tags = (v.styles || []).map(s => `<span class="style-tag">${esc(s)}</span>`).join('');
+  const position = total > 1 ? `${idx + 1} of ${total}` : '1 photo';
+
   return `
-    <div class="ifeed-post" id="ifeed-post-${v.id}">
-      <img src="${esc(v.photoUrl)}" class="ifeed-photo" loading="lazy" />
+    <article class="ifeed-post" id="ifeed-post-${v.id}">
+      <div class="ifeed-photo-wrap">
+        <img src="${esc(v.photoUrl)}" class="ifeed-photo" loading="lazy" onerror="this.closest('.ifeed-photo-wrap').classList.add('image-error');this.remove();" />
+        <div class="ifeed-photo-fallback">${pizzaPlaceholderSvg(44)}</div>
+      </div>
       <div class="ifeed-meta">
         <div class="ifeed-top-row">
           ${v.rating != null ? `<div class="ifeed-rating">${formatRating(v.rating)}</div>` : '<div></div>'}
           ${tags ? `<div class="ifeed-tags">${tags}</div>` : ''}
         </div>
         <div class="ifeed-place">${esc(v.placeName || 'Unknown')}</div>
-        ${loc ? `<div class="ifeed-sub">${esc(loc)}</div>` : ''}
-        ${dStr ? `<div class="ifeed-date">${dStr}</div>` : ''}
+        <div class="ifeed-subline">
+          ${loc ? `<span>${esc(loc)}</span>` : ''}
+          ${loc && dStr ? '<span class="ifeed-dot">·</span>' : ''}
+          ${dStr ? `<span>${dStr}</span>` : ''}
+        </div>
         ${v.notes ? `<div class="ifeed-notes">${esc(v.notes)}</div>` : ''}
+        <div class="ifeed-actions">
+          <button class="ifeed-view-entry" onclick="openFeedEntry('${v.id}')">View Entry →</button>
+          <span class="ifeed-position">${position}</span>
+        </div>
       </div>
-    </div>`;
+    </article>`;
+}
+
+function openFeedEntry(id) {
+  closeFeedPhoto();
+  setTimeout(() => openEntry(id), 40);
 }
 
 function closeFeedPhoto() {
   document.getElementById('feed-photo-overlay').classList.add('hidden');
   const scroll = document.getElementById('ifeed-scroll');
-  if (scroll) scroll.innerHTML = ''; // free image memory
+  if (scroll) scroll.innerHTML = '';
   _feedCurrentFilteredList = [];
 }
+
 
 // ── DESTINATIONS ──────────────────────────────────────────────
 
