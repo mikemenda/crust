@@ -1,0 +1,564 @@
+/* ============================================================
+   CRUST — UI Polish Pass
+   Focus: Home, Journey, Log Pizza, shared cards/sheets.
+   Logic stays in app.js; this file only refines presentation.
+   ============================================================ */
+
+:root {
+  --bg-card: #1B1B1B;
+  --bg-elevated: #232323;
+  --bg-sheet: #1B1B1B;
+  --card-border: rgba(200,169,126,.12);
+  --card-border-strong: rgba(200,169,126,.20);
+  --soft-border: rgba(240,234,214,.07);
+  --danger: #C94F32;
+  --r-lg: 20px;
+  --r-xl: 24px;
+}
+
+/* ── Global rhythm / type tightening ───────────────────────── */
+.screen {
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 8px);
+}
+
+.app-header {
+  padding: calc(var(--safe-top) + 12px) 20px 12px;
+}
+
+.wordmark {
+  letter-spacing: 3px;
+}
+
+.section-label,
+.form-label,
+.filter-sheet-title,
+.tagline {
+  letter-spacing: 1.15px;
+}
+
+.section-header {
+  padding: 4px 20px 10px;
+}
+
+.btn-see-all {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .1px;
+}
+
+/* ── Utility header buttons: globe/feed should look crisp ───── */
+.app-header .btn-icon[aria-label="World map"],
+.app-header .btn-icon[aria-label="Photo feed"] {
+  width: 34px;
+  height: 34px;
+  background: rgba(240,234,214,.055);
+  border: 1px solid rgba(240,234,214,.06);
+  color: rgba(240,234,214,.62) !important;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-header .btn-icon[aria-label="World map"] svg,
+.app-header .btn-icon[aria-label="Photo feed"] svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.7;
+  shape-rendering: geometricPrecision;
+}
+
+.app-header .btn-icon[aria-label="World map"]:active,
+.app-header .btn-icon[aria-label="Photo feed"]:active {
+  background: rgba(240,234,214,.09);
+  transform: scale(.96);
+}
+
+/* ── Card system ───────────────────────────────────────────── */
+.stat-card,
+.entry-card,
+.search-bar,
+.form-input,
+.photo-area,
+.globe-teaser,
+.home-photo-cell,
+.filter-pill,
+.style-chip,
+.detail-sheet,
+.place-detail-sheet,
+.filter-sheet {
+  border-color: var(--soft-border);
+}
+
+.stat-card,
+.entry-card,
+.globe-teaser {
+  border: 1px solid var(--card-border);
+  box-shadow: none;
+}
+
+/* ── Home stats ────────────────────────────────────────────── */
+.stats-grid {
+  gap: 8px;
+  padding: 2px 16px 16px;
+}
+
+.stat-card {
+  min-height: 82px;
+  padding: 14px 14px 12px;
+  border-radius: 22px;
+}
+
+.stat-card::after {
+  left: 18px;
+  right: 18px;
+  opacity: .16;
+}
+
+.stat-label {
+  font-size: 9.5px;
+  letter-spacing: 1px;
+}
+
+.stat-num {
+  font-size: 34px;
+  letter-spacing: -.8px;
+}
+
+.stat-card.streak {
+  min-height: 78px;
+  padding: 13px 16px;
+  gap: 12px;
+}
+
+.streak-emoji {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(216,90,48,.12);
+  border: 1px solid rgba(216,90,48,.16);
+  font-size: 23px;
+}
+
+.streak-num { font-size: 28px; }
+.streak-title { letter-spacing: 1px; }
+.streak-status {
+  color: rgba(216,90,48,.9);
+  font-size: 11px;
+}
+
+/* ── Home photo feed ───────────────────────────────────────── */
+#home-photo-strip-section {
+  margin-top: 2px;
+}
+
+.home-photo-grid {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.home-photo-grid::-webkit-scrollbar { display: none; }
+
+.home-photo-cell {
+  flex: 0 0 31.5%;
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  border-radius: 18px;
+  background: #202020;
+  border: 1px solid var(--soft-border);
+  overflow: hidden;
+}
+
+.home-photo-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: linear-gradient(135deg, rgba(200,169,126,.10), rgba(240,234,214,.035));
+}
+
+/* ── Entry cards / Journey list ────────────────────────────── */
+.entry-feed,
+.journey-feed {
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.entry-card {
+  min-height: 92px;
+  padding: 12px 13px;
+  gap: 11px;
+  align-items: center;
+  border-radius: 22px;
+  background: #1B1B1B;
+}
+
+.entry-thumb,
+.entry-thumb-placeholder {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+}
+
+.entry-thumb-placeholder {
+  background: linear-gradient(145deg, rgba(240,234,214,.045), rgba(240,234,214,.015));
+  border: 1px solid rgba(240,234,214,.04);
+}
+
+.pizza-placeholder-svg {
+  display: block;
+  opacity: .96;
+}
+
+.entry-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.entry-place-row {
+  gap: 7px;
+  margin-bottom: 1px;
+}
+
+.entry-place-logo:empty { display: none; }
+
+.entry-place {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.18;
+}
+
+.entry-sub {
+  font-size: 12.5px;
+  line-height: 1.25;
+  margin-bottom: 7px;
+  color: rgba(240,234,214,.42);
+}
+
+.style-tag {
+  font-size: 9px;
+  letter-spacing: .55px;
+  padding: 2px 8px 2.5px;
+  background: rgba(200,169,126,.16);
+}
+
+.entry-right {
+  align-self: center;
+  min-width: 34px;
+}
+
+.entry-rating-num {
+  font-size: 23px;
+  line-height: 1;
+  font-weight: 300;
+  letter-spacing: -.4px;
+}
+
+.entry-rating-denom {
+  display: none !important;
+}
+
+/* ── Journey controls ──────────────────────────────────────── */
+.journey-search-wrap {
+  padding: 0 16px 10px;
+}
+
+.search-bar {
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 18px;
+}
+
+.search-bar input {
+  font-size: 15px;
+}
+
+.journey-filters {
+  gap: 7px;
+  padding: 0 16px 10px;
+}
+
+.filter-pill {
+  padding: 7px 14px;
+  min-height: 34px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: rgba(240,234,214,.045);
+}
+
+.journey-count {
+  padding: 0 16px 8px;
+  font-size: 11.5px;
+}
+
+/* ── Swipe actions ─────────────────────────────────────────── */
+.swipe-wrapper {
+  border-radius: 22px;
+}
+
+.swipe-reveal {
+  padding: 0 18px;
+  font-size: 11px;
+  letter-spacing: .45px;
+}
+
+.swipe-reveal-edit {
+  background: var(--amber);
+}
+
+.swipe-reveal-delete {
+  background: var(--danger);
+}
+
+.swipe-wrapper .entry-card {
+  border-radius: 22px;
+}
+
+/* ── Bottom sheets ─────────────────────────────────────────── */
+.detail-overlay,
+.place-detail-overlay,
+.filter-sheet-overlay {
+  background: rgba(0,0,0,.72);
+}
+
+.detail-sheet,
+.place-detail-sheet,
+.filter-sheet {
+  background: #1B1B1B;
+  border-radius: 24px 24px 0 0;
+  border-top: 1px solid var(--card-border);
+  box-shadow: 0 -18px 50px rgba(0,0,0,.35);
+}
+
+.detail-topbar,
+.place-detail-topbar,
+.filter-sheet-header,
+.globe-pin-popup-topbar {
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid rgba(240,234,214,.065);
+}
+
+.detail-action-btns {
+  gap: 8px;
+}
+
+.btn-detail-edit,
+.btn-detail-delete {
+  min-height: 36px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.btn-detail-delete {
+  color: var(--danger);
+  border-color: rgba(201,79,50,.55);
+}
+
+.detail-scroll,
+.place-detail-scroll {
+  padding: 18px 20px calc(var(--safe-bottom) + 32px);
+}
+
+.detail-place-name {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.18;
+  margin-bottom: 4px;
+}
+
+.detail-location-line {
+  font-size: 14px;
+  margin-bottom: 18px;
+  color: rgba(240,234,214,.48);
+}
+
+.detail-meta-row.detail-meta-grid {
+  display: grid;
+  grid-template-columns: .72fr 1fr;
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 14px;
+}
+
+.detail-meta-item {
+  background: rgba(240,234,214,.035);
+  border: 1px solid rgba(240,234,214,.055);
+  border-radius: 16px;
+  padding: 11px 13px;
+}
+
+.detail-meta-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 5px;
+}
+
+.detail-rating-big {
+  font-size: 30px;
+  font-weight: 300;
+  color: var(--cream);
+  line-height: 1;
+}
+
+.detail-rating-big span { display: none; }
+
+.detail-date-str {
+  font-size: 15px;
+  color: var(--cream);
+  line-height: 1.15;
+}
+
+.detail-tags-row {
+  margin-bottom: 12px;
+}
+
+.filter-sheet {
+  max-height: min(62vh, 480px);
+}
+
+.filter-sheet-header {
+  padding: 15px 20px 13px;
+}
+
+.filter-options {
+  padding: 6px 0 calc(var(--safe-bottom) + 20px);
+}
+
+.filter-option {
+  min-height: 52px;
+  padding: 13px 20px;
+  font-size: 16px;
+}
+
+.filter-option-check {
+  width: 21px;
+  height: 21px;
+}
+
+.filter-option.selected .filter-option-check {
+  background: var(--amber);
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(200,169,126,.08);
+}
+
+/* ── Log Pizza form ────────────────────────────────────────── */
+#screen-log {
+  background: var(--bg);
+}
+
+.log-header {
+  padding: calc(var(--safe-top) + 20px) 20px 16px;
+}
+
+.log-title {
+  font-size: 18px;
+  letter-spacing: 1.65px;
+  font-weight: 300;
+}
+
+.log-scroll {
+  padding-bottom: calc(var(--safe-bottom) + 20px);
+}
+
+.form-block {
+  padding: 0 20px;
+  margin-bottom: 20px;
+}
+
+.form-label {
+  font-size: 10px;
+  margin-bottom: 7px;
+}
+
+.form-input {
+  min-height: 52px;
+  padding: 12px 15px;
+  border-radius: 18px;
+  background: #1B1B1B;
+}
+
+.rating-row {
+  gap: 14px;
+}
+
+.rating-big {
+  font-size: 32px;
+  min-width: 58px;
+  letter-spacing: -.5px;
+}
+
+input[type="range"].rating-slider::-webkit-slider-thumb {
+  width: 21px;
+  height: 21px;
+  box-shadow: 0 0 0 7px rgba(200,169,126,.08);
+}
+
+.rating-max {
+  font-size: 14px;
+}
+
+.style-grid {
+  gap: 8px;
+}
+
+.style-chip {
+  min-height: 42px;
+  padding: 9px 6px;
+  border-radius: 13px;
+  background: rgba(240,234,214,.045);
+  color: rgba(240,234,214,.52);
+  font-size: 12px;
+}
+
+.style-chip.on {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #141414;
+  box-shadow: 0 0 0 3px rgba(200,169,126,.07);
+}
+
+.photo-area {
+  min-height: 88px;
+  border-radius: 18px;
+  background: rgba(240,234,214,.025);
+  border-color: rgba(240,234,214,.10);
+}
+
+textarea.form-input {
+  min-height: 108px;
+}
+
+.log-footer {
+  padding: 4px 20px calc(var(--safe-bottom) + 10px);
+}
+
+.btn-save {
+  min-height: 54px;
+  padding: 14px 16px;
+  border-radius: 999px;
+  font-size: 15.5px;
+  box-shadow: 0 8px 26px rgba(200,169,126,.16);
+}
+
+/* ── Bottom nav ────────────────────────────────────────────── */
+.nav-fab {
+  width: 50px;
+  height: 50px;
+  box-shadow: 0 5px 18px rgba(216,90,48,.26);
+}
+
+.nav-fab:active {
+  box-shadow: 0 3px 12px rgba(216,90,48,.18);
+}
+
+.bottom-nav {
+  background: rgba(18,18,18,.95);
+}

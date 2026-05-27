@@ -276,7 +276,7 @@ function entryCard(id, v, context = 'open-entry') {
   const tags = (v.styles || []).slice(0,2).map(s => `<span class="style-tag">${esc(s)}</span>`).join('');
   const thumb = v.photoUrl
     ? `<img src="${esc(v.photoUrl)}" class="entry-thumb" loading="lazy" />`
-    : `<div class="entry-thumb-placeholder">🍕</div>`;
+    : `<div class="entry-thumb-placeholder" aria-label="No pizza photo">${pizzaPlaceholderSvg(34)}</div>`;
   const tapFn = (context === 'open-place' && v.placeId)
     ? `openPlace('${esc(v.placeId)}')`
     : `openEntry('${id}')`;
@@ -285,7 +285,7 @@ function entryCard(id, v, context = 'open-entry') {
   const logoUrl = v.placeId ? (_placeLogos[v.placeId] || null) : null;
   const logoHtml = logoUrl
     ? `<span class="entry-place-logo"><img src="${esc(logoUrl)}" loading="lazy" /></span>`
-    : `<span class="entry-place-logo entry-place-logo--default">${pizzaLogoSvg(14)}</span>`;
+    : '';
 
   return `
     <div class="swipe-wrapper" data-entry-id="${id}">
@@ -309,7 +309,6 @@ function entryCard(id, v, context = 'open-entry') {
         </div>
         <div class="entry-right">
           <div class="entry-rating-num">${v.rating ?? '—'}</div>
-          <div class="entry-rating-denom">/ 10</div>
         </div>
       </div>
     </div>`;
@@ -347,9 +346,15 @@ async function openEntry(id) {
       ${v.photoUrl ? `<img src="${esc(v.photoUrl)}" class="detail-photo" />` : ''}
       <div class="detail-place-name">${esc(v.placeName || 'Unknown')}</div>
       ${loc ? `<div class="detail-location-line">${esc(loc)}</div>` : ''}
-      <div class="detail-meta-row">
-        <div class="detail-rating-big">${(v.rating ?? '—')}<span> / 10</span></div>
-        <div class="detail-date-str">${dStr}</div>
+      <div class="detail-meta-row detail-meta-grid">
+        <div class="detail-meta-item">
+          <div class="detail-meta-label">Rating</div>
+          <div class="detail-rating-big">${(v.rating ?? '—')}</div>
+        </div>
+        <div class="detail-meta-item">
+          <div class="detail-meta-label">Date</div>
+          <div class="detail-date-str">${dStr}</div>
+        </div>
       </div>
       ${tags ? `<div class="detail-tags-row">${tags}</div>` : ''}
       ${v.notes ? `<div class="detail-notes-box">${esc(v.notes)}</div>` : ''}
@@ -644,6 +649,18 @@ function pizzaLogoSvg(size = 20) {
     <circle cx="4.4" cy="11"   r="0.6" fill="#D85A30"/>
     <circle cx="8"   cy="7"    r="0.6" fill="#D85A30"/>
     <circle cx="7.4" cy="12.6" r="0.5" fill="#D85A30"/>
+  </svg>`;
+}
+
+// App-native placeholder for pizza entries without an uploaded photo.
+function pizzaPlaceholderSvg(size = 34) {
+  return `<svg class="pizza-placeholder-svg" viewBox="0 0 64 64" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M15 13c13.5 1.4 25.7 6.7 36 16L26.5 53.5C19.5 43.3 15.6 29.8 15 13Z" fill="rgba(200,169,126,.22)"/>
+    <path d="M15 13c13.5 1.4 25.7 6.7 36 16" fill="none" stroke="#C8A97E" stroke-width="4" stroke-linecap="round"/>
+    <path d="M20.8 20.4c9.1 2 17.1 5.6 24 10.8" fill="none" stroke="rgba(240,234,214,.34)" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="28" cy="30" r="3" fill="#D85A30" opacity=".82"/>
+    <circle cx="35.8" cy="38" r="2.5" fill="#D85A30" opacity=".82"/>
+    <circle cx="25" cy="43.5" r="2.4" fill="#D85A30" opacity=".82"/>
   </svg>`;
 }
 
@@ -1695,12 +1712,10 @@ document.getElementById('photo-area').addEventListener('click', () =>
     const overlay = document.getElementById(id);
     if (!overlay) return;
 
-    // Tap backdrop (dark area outside sheet) → close place/dest overlays only
-    if (id === 'place-detail-overlay' || id === 'dest-detail-overlay') {
-      overlay.addEventListener('click', e => {
-        if (e.target === overlay) closeFn();
-      });
-    }
+    // Tap backdrop (dark area outside sheet) → close without disturbing sheet content.
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) closeFn();
+    });
 
     const sheet      = overlay.querySelector('.place-detail-sheet, .detail-sheet');
     const scrollArea = overlay.querySelector('.place-detail-scroll, .detail-scroll');
@@ -2281,7 +2296,7 @@ function buildIFeedPost(v) {
       <img src="${esc(v.photoUrl)}" class="ifeed-photo" loading="lazy" />
       <div class="ifeed-meta">
         <div class="ifeed-top-row">
-          ${v.rating != null ? `<div class="ifeed-rating">${v.rating}<span> / 10</span></div>` : '<div></div>'}
+          ${v.rating != null ? `<div class="ifeed-rating">${v.rating}</div>` : '<div></div>'}
           ${tags ? `<div class="ifeed-tags">${tags}</div>` : ''}
         </div>
         <div class="ifeed-place">${esc(v.placeName || 'Unknown')}</div>
