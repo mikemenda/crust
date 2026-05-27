@@ -130,6 +130,8 @@ async function loadStats(uid) {
     set('stat-countries', countries);
     set('stat-streak',   streak);
     set('streak-status', streakLabel(streak, _streakStartDate));
+    set('globe-teaser-cities',    cities);
+    set('globe-teaser-countries', countries);
     updateGlobeTeaser(visits);
   } catch (e) {
     console.error('loadStats:', e);
@@ -900,6 +902,15 @@ async function openPlace(placeId) {
           ${loc ? `<div class="place-detail-location">${esc(loc)}</div>` : ''}
         </div>
       </div>
+      ${place.isWishlist ? `
+      <div style="padding: 0 0 20px;">
+        <button class="btn-save" onclick="logFromWishlist('${esc(placeId)}')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" style="vertical-align:middle;margin-right:6px;">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Log a Pizza Here
+        </button>
+      </div>` : ''}
       <div class="place-stats-row">
         <div class="place-stat-chip">
           <div class="place-stat-chip-num">${vc}</div>
@@ -928,6 +939,35 @@ function closePlaceDetail() {
   const overlay = document.getElementById('place-detail-overlay');
   overlay.classList.add('hidden');
   overlay.style.zIndex = ''; // reset so it doesn't stay elevated
+}
+
+// ── Log Pizza from Bucket List ────────────────────────────────
+// Opens the log form with the wishlist place pre-loaded.
+// saveEntry() already sets isWishlist:false on commit, so the
+// bucket-list entry converts automatically once the visit is saved.
+function logFromWishlist(placeId) {
+  const p = _placesAll.find(pl => (pl.placeId || pl.id) === placeId);
+  if (!p) return;
+
+  closePlaceDetail();
+  openLog();
+
+  requestAnimationFrame(() => {
+    document.getElementById('place-input').value = p.name || '';
+    selectedPlace = {
+      placeId: p.placeId || placeId,
+      name:    p.name    || '',
+      address: p.address || '',
+      city:    p.city    || '',
+      country: p.country || '',
+      lat:     p.lat     ?? null,
+      lng:     p.lng     ?? null,
+    };
+    qv('override-city',    p.city    || '');
+    qv('override-country', p.country || '');
+    const locRow = document.getElementById('place-location-row');
+    if (locRow) locRow.classList.add('visible');
+  });
 }
 
 async function changePlaceLogo(placeId) {
@@ -1747,20 +1787,24 @@ async function loadPassport() {
   body.innerHTML = '<div class="empty-state"><div class="empty-body" style="opacity:.35;font-size:14px;">Loading…</div></div>';
 
   try {
-    const [visSnap, plSnap] = await Promise.all([
+    const [visSnap, plSnap, settingsSnap] = await Promise.all([
       db.collection(`users/${currentUser.uid}/visits`).get(),
       db.collection(`users/${currentUser.uid}/places`).get(),
+      db.collection(`users/${currentUser.uid}/settings`).doc('streakSettings').get().catch(() => null),
     ]);
     const visits = visSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const places = plSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => !p.isWishlist);
-    renderPassportContent(visits, places, body);
+    const passportStreakStart = (settingsSnap && settingsSnap.exists)
+      ? (settingsSnap.data().startDate || null) : null;
+    const passportStreak = calcSundayStreak(visits, passportStreakStart);
+    renderPassportContent(visits, places, body, passportStreak);
   } catch (e) {
     console.error('loadPassport:', e);
     if (body) body.innerHTML = '<div class="empty-state"><div class="empty-body">Couldn\'t load stats.</div></div>';
   }
 }
 
-function renderPassportContent(visits, places, body) {
+function renderPassportContent(visits, places, body, streak = 0) {
   if (!visits.length) {
     body.innerHTML = `<div class="empty-state">
       <div class="empty-icon">🛂</div>
@@ -1845,6 +1889,13 @@ function renderPassportContent(visits, places, body) {
       <div class="stat-card"><div class="stat-label">Spots</div><div class="stat-num">${spots}</div></div>
       <div class="stat-card"><div class="stat-label">Cities</div><div class="stat-num">${cities}</div></div>
       <div class="stat-card"><div class="stat-label">Countries</div><div class="stat-num">${countries}</div></div>
+      <div class="stat-card streak" style="grid-column:span 2;cursor:default;">
+        <div class="streak-emoji">🔥</div>
+        <div class="streak-body">
+          <div class="streak-num">${streak}</div>
+          <div class="streak-title">Sunday Streak</div>
+        </div>
+      </div>
     </div>
 
     ${styleData.length ? `
