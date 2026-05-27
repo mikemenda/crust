@@ -410,9 +410,8 @@ function startEditEntry() {
 
   // Styles
   selectedStyles = v.styles || [];
-  document.querySelectorAll('.style-chip').forEach(c => {
-    c.classList.toggle('on', selectedStyles.includes(c.dataset.style));
-  });
+  renderLogStyleSummary();
+  renderStyleSheetOptions();
 
   // Notes
   qv('log-notes', v.notes || '');
@@ -421,7 +420,7 @@ function startEditEntry() {
   existingPhotoUrl = v.photoUrl || null;
   if (v.photoUrl) {
     const pa = document.getElementById('photo-area-inner');
-    if (pa) pa.innerHTML = `<img src="${esc(v.photoUrl)}" /><div class="photo-overlay">Tap to change</div>`;
+    if (pa) pa.innerHTML = photoAreaPreview(v.photoUrl);
   }
 
   // Update log screen title and button
@@ -655,12 +654,12 @@ function pizzaLogoSvg(size = 20) {
 // App-native placeholder for pizza entries without an uploaded photo.
 function pizzaPlaceholderSvg(size = 34) {
   return `<svg class="pizza-placeholder-svg" viewBox="0 0 64 64" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M15 13c13.5 1.4 25.7 6.7 36 16L26.5 53.5C19.5 43.3 15.6 29.8 15 13Z" fill="rgba(200,169,126,.22)"/>
-    <path d="M15 13c13.5 1.4 25.7 6.7 36 16" fill="none" stroke="#C8A97E" stroke-width="4" stroke-linecap="round"/>
-    <path d="M20.8 20.4c9.1 2 17.1 5.6 24 10.8" fill="none" stroke="rgba(240,234,214,.34)" stroke-width="2.2" stroke-linecap="round"/>
-    <circle cx="28" cy="30" r="3" fill="#D85A30" opacity=".82"/>
-    <circle cx="35.8" cy="38" r="2.5" fill="#D85A30" opacity=".82"/>
-    <circle cx="25" cy="43.5" r="2.4" fill="#D85A30" opacity=".82"/>
+    <path d="M14.5 13.5c13.9 1 26.7 6.4 37.5 15.9L26.7 54.7C18.9 43.5 14.8 29.6 14.5 13.5Z" fill="none" stroke="#C8A97E" stroke-width="3.4" stroke-linejoin="round"/>
+    <path d="M14.7 13.6c13.8 1.1 26.5 6.4 37.1 15.8" fill="none" stroke="#E6D1A9" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="M21.5 24.4c7.7 1.9 14.6 5.2 20.4 9.7" fill="none" stroke="rgba(240,234,214,.48)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="29" cy="33" r="2.6" fill="#D85A30"/>
+    <circle cx="36.8" cy="40.4" r="2.3" fill="#D85A30"/>
+    <circle cx="25.8" cy="44.6" r="2.1" fill="#D85A30"/>
   </svg>`;
 }
 
@@ -1199,7 +1198,8 @@ function resetLog() {
   document.getElementById('autocomplete-list').innerHTML = '';
   document.getElementById('place-hidden').value = '';
 
-  document.querySelectorAll('.style-chip').forEach(c => c.classList.remove('on'));
+  renderLogStyleSummary();
+  renderStyleSheetOptions();
 
   // Reset photo
   const pa = document.getElementById('photo-area-inner');
@@ -1231,19 +1231,62 @@ document.getElementById('rating-slider').addEventListener('input', function() {
   document.getElementById('rating-display').textContent = selectedRating.toFixed(1);
 });
 
-// Style chips
-document.querySelectorAll('.style-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    const s = chip.dataset.style;
-    if (selectedStyles.includes(s)) {
-      selectedStyles = selectedStyles.filter(x => x !== s);
-      chip.classList.remove('on');
-    } else {
-      selectedStyles.push(s);
-      chip.classList.add('on');
-    }
-  });
-});
+// Style picker bottom sheet
+const LOG_STYLE_OPTIONS = [
+  'Al Taglio', 'Deep Dish', 'Detroit',
+  'Neapolitan', 'New York', 'Pan Pizza',
+  'Sicilian', 'Tavern Style', 'Other'
+];
+
+function renderLogStyleSummary() {
+  const el = document.getElementById('style-summary');
+  if (!el) return;
+  if (!selectedStyles.length) {
+    el.textContent = 'Pick styles';
+    el.classList.add('muted');
+    return;
+  }
+  el.textContent = selectedStyles.join(', ');
+  el.classList.remove('muted');
+}
+
+function renderStyleSheetOptions() {
+  const list = document.getElementById('style-sheet-options');
+  if (!list) return;
+  list.innerHTML = LOG_STYLE_OPTIONS.map(style => {
+    const active = selectedStyles.includes(style);
+    return `
+      <button type="button" class="style-sheet-chip ${active ? 'on' : ''}" onclick="toggleLogStyle('${esc(style)}')">
+        <span>${esc(style)}</span>
+        ${active ? '<span class="style-sheet-check">✓</span>' : ''}
+      </button>`;
+  }).join('');
+}
+
+function openStyleSheet() {
+  renderStyleSheetOptions();
+  document.getElementById('style-sheet-overlay')?.classList.remove('hidden');
+}
+
+function closeStyleSheet() {
+  document.getElementById('style-sheet-overlay')?.classList.add('hidden');
+}
+
+function clearLogStyles() {
+  selectedStyles = [];
+  renderLogStyleSummary();
+  renderStyleSheetOptions();
+}
+
+function toggleLogStyle(style) {
+  if (selectedStyles.includes(style)) {
+    selectedStyles = selectedStyles.filter(x => x !== style);
+  } else {
+    selectedStyles.push(style);
+  }
+  renderLogStyleSummary();
+  renderStyleSheetOptions();
+}
 
 // ── Google Places Autocomplete (REST API — no JS SDK needed) ──
 // Uses Places API (New) directly via fetch. No script tag required.
@@ -1360,18 +1403,19 @@ document.getElementById('photo-input').addEventListener('change', function() {
   selectedPhoto = this.files[0];
   const url = URL.createObjectURL(selectedPhoto);
   const pa  = document.getElementById('photo-area-inner');
-  pa.innerHTML = `
-    <img src="${url}" />
-    <div class="photo-overlay">Tap to change</div>`;
+  if (pa) pa.innerHTML = photoAreaPreview(url);
 });
 
 function photoAreaDefault() {
   return `
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-      <circle cx="12" cy="13" r="4"/>
-    </svg>
-    <span>Add photo</span>`;
+    <span class="photo-row-icon">+</span>
+    <span class="photo-row-copy">Add photo</span>`;
+}
+
+function photoAreaPreview(url) {
+  return `
+    <img src="${esc(url)}" class="photo-row-preview" alt="Pizza photo preview" />
+    <span class="photo-row-copy">Change photo</span>`;
 }
 
 // ── Save Entry ────────────────────────────────────────────────
@@ -1564,7 +1608,7 @@ function initSwipeCards() {
 
     let startX = 0, startY = 0, dx = 0;
     let dragging = false, isScrolling = false;
-    const TRIGGER = 72; // px to trigger action
+    const TRIGGER = 54; // px to trigger action
 
     wrapper.addEventListener('touchstart', e => {
       if (_openSwipeWrapper && _openSwipeWrapper !== wrapper) resetAllSwipes();
@@ -1588,7 +1632,7 @@ function initSwipeCards() {
       if (isScrolling) return;
       e.preventDefault(); // prevent page scroll during horizontal swipe
       dx = moveX;
-      const clamped = Math.max(-(TRIGGER + 24), Math.min(TRIGGER, dx));
+      const clamped = Math.max(-72, Math.min(72, dx));
       card.style.transform = `translateX(${clamped}px)`;
     }, { passive: false });
 

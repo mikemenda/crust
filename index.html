@@ -297,7 +297,13 @@
       </div>
       <!-- Streak — full width, tappable to set start date -->
       <div class="stat-card streak" onclick="openStreakSettings()" style="cursor:pointer;">
-        <div class="streak-emoji">🔥</div>
+        <div class="streak-emoji streak-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.2 21c4.1 0 7-2.7 7-6.8 0-2.7-1.4-5.2-3.7-7.6-.4 2.3-1.3 3.7-2.5 4.5.4-3.5-.9-6.1-3.7-8.1.1 3.6-1.6 5.3-3.2 7.1-1.1 1.2-1.9 2.5-1.9 4.3 0 4 3 6.6 8 6.6Z" fill="currentColor" opacity=".22"/>
+            <path d="M12.2 21c4.1 0 7-2.7 7-6.8 0-2.7-1.4-5.2-3.7-7.6-.4 2.3-1.3 3.7-2.5 4.5.4-3.5-.9-6.1-3.7-8.1.1 3.6-1.6 5.3-3.2 7.1-1.1 1.2-1.9 2.5-1.9 4.3 0 4 3 6.6 8 6.6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M12.1 18.4c1.7 0 2.9-1.1 2.9-2.9 0-1.3-.6-2.4-1.8-3.5-.2 1.1-.7 1.8-1.4 2.2.1-1.5-.4-2.7-1.6-3.7 0 1.7-.8 2.5-1.5 3.3-.5.6-.8 1.1-.8 1.9 0 1.6 1.3 2.7 4.2 2.7Z" fill="currentColor" opacity=".42"/>
+          </svg>
+        </div>
         <div class="streak-body">
           <div class="streak-num" id="stat-streak">—</div>
           <div class="streak-title">Sunday Streak</div>
@@ -435,33 +441,23 @@
       </div>
 
       <!-- Style -->
-      <div class="form-block">
+      <div class="form-block form-block--compact">
         <label class="form-label">Style <span class="optional">— pick any</span></label>
-        <div class="style-grid">
-          <button class="style-chip" data-style="Al Taglio">Al Taglio</button>
-          <button class="style-chip" data-style="Deep Dish">Deep Dish</button>
-          <button class="style-chip" data-style="Detroit">Detroit</button>
-          <button class="style-chip" data-style="Neapolitan">Neapolitan</button>
-          <button class="style-chip" data-style="New York">New York</button>
-          <button class="style-chip" data-style="Pan Pizza">Pan Pizza</button>
-          <button class="style-chip" data-style="Sicilian">Sicilian</button>
-          <button class="style-chip" data-style="Tavern Style">Tavern Style</button>
-          <button class="style-chip" data-style="Other">Other</button>
-        </div>
+        <button type="button" class="form-select-row" id="style-picker-row" onclick="openStyleSheet()">
+          <span id="style-summary">Pick styles</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
       </div>
 
       <!-- Photo -->
-      <div class="form-block">
+      <div class="form-block form-block--compact">
         <label class="form-label">Photo <span class="optional">— optional</span></label>
-        <div class="photo-area" id="photo-area">
-          <div id="photo-area-inner" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45">
-              <path d="M8 4h11a2 2 0 0 1 2 2v11"/>
-              <rect x="2" y="7" width="16" height="14" rx="2"/>
-              <circle cx="7" cy="13" r="1.5"/>
-              <polyline points="3 21 7.5 14.5 10.5 18 14 13 19 21"/>
-            </svg>
-            <span>Add photo</span>
+        <div class="photo-area photo-area--compact" id="photo-area">
+          <div id="photo-area-inner" class="photo-area-inner">
+            <span class="photo-row-icon">+</span>
+            <span class="photo-row-copy">Add photo</span>
           </div>
         </div>
         <input type="file" id="photo-input" accept="image/*" style="display:none">
@@ -754,6 +750,7 @@
   <!-- ─── ENTRY DETAIL OVERLAY ─────────────────────────── -->
   <div id="entry-detail-overlay" class="detail-overlay hidden">
     <div class="detail-sheet">
+      <div class="sheet-drag-handle" aria-hidden="true"></div>
       <div class="detail-topbar">
         <button class="btn-icon" onclick="closeEntryDetail()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -782,9 +779,24 @@
     </div>
   </div>
 
+  <!-- ─── STYLE PICKER SHEET ──────────────────────────── -->
+  <div id="style-sheet-overlay" class="filter-sheet-overlay hidden" onclick="closeStyleSheet()">
+    <div class="filter-sheet style-sheet" onclick="event.stopPropagation()">
+      <div class="filter-sheet-header">
+        <span class="filter-sheet-title">Style</span>
+        <button class="filter-sheet-clear" onclick="clearLogStyles()">Clear</button>
+      </div>
+      <div class="style-sheet-options" id="style-sheet-options"></div>
+      <div class="style-sheet-footer">
+        <button type="button" class="btn-save btn-save--compact" onclick="closeStyleSheet()">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ─── PLACE DETAIL OVERLAY ──────────────────────────── -->
   <div id="place-detail-overlay" class="place-detail-overlay hidden">
     <div class="place-detail-sheet">
+      <div class="sheet-drag-handle" aria-hidden="true"></div>
       <div class="place-detail-topbar">
         <button class="btn-icon" onclick="closePlaceDetail()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
