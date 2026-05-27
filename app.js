@@ -2385,8 +2385,8 @@ function initPassportYearReviewGestures() {
     // Horizontal intent only: small threshold, but ignore normal vertical scrolls.
     if (adx < 34 || adx < ady * 1.15) return;
 
-    // Swipe left = older year. Swipe right = newer year.
-    passportChangeYear(dx < 0 ? 1 : -1);
+    // Natural carousel feel: swipe left moves toward the newer/previous item, swipe right moves toward the older/next item.
+    passportChangeYear(dx < 0 ? -1 : 1);
   };
 
   const onTouchStart = (e) => {
