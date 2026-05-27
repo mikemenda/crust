@@ -1186,3 +1186,71 @@ textarea.form-input {
   margin-top: 0;
   transform: translateY(7px);
 }
+
+/* ── Home World Map inline stat row — final alignment reset ──
+   Converts the teaser to: icon · 5 Cities · 4 Countries · chevron.
+   This avoids stacked stat blocks competing with the globe icon. */
+#screen-home .globe-teaser-card {
+  min-height: 72px;
+  padding-top: 13px;
+  padding-bottom: 13px;
+  gap: 0;
+  align-items: center;
+}
+#screen-home .globe-teaser-icon {
+  width: 52px;
+  margin-right: 18px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#screen-home .globe-teaser-icon svg {
+  width: 40px;
+  height: 40px;
+}
+#screen-home .globe-teaser-info {
+  flex: 1;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+#screen-home .globe-geo-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transform: none;
+}
+#screen-home .globe-geo-stat {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 6px;
+  padding-top: 0;
+  transform: none;
+  min-width: 0;
+}
+#screen-home .globe-geo-num {
+  font-size: 29px;
+  line-height: 1;
+  letter-spacing: -0.7px;
+}
+#screen-home .globe-geo-label {
+  margin-top: 0;
+  font-size: 12.5px;
+  line-height: 1;
+  color: rgba(240,234,214,.48);
+  transform: translateY(-1px);
+}
+#screen-home .globe-geo-divider {
+  height: 26px;
+  margin: 0 2px;
+  transform: none;
+  opacity: .52;
+}
+#screen-home .globe-teaser-card > svg:last-child {
+  margin-left: auto;
+}
