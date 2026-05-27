@@ -1256,433 +1256,375 @@ textarea.form-input {
 }
 
 /* ============================================================
-   PLACES — full polish pass
-   Scope: Places, Visited, Destinations, Bucket List only.
+   PLACES — final refinement pass
+   Scope: Places tabs/cards/sheets/destinations/bucket list only.
    ============================================================ */
 
-/* Places top controls: smaller, cleaner segmented controls */
+/* Top tabs + sort controls: lighter, tighter segmented feel */
 .places-tabs {
-  padding: 0 16px 10px;
   gap: 8px;
+  padding: 0 16px 10px;
 }
 .places-tab {
-  min-height: 44px;
-  padding: 8px 10px;
-  border-radius: 15px;
-  background: rgba(240,234,214,.035);
-  border: 1px solid rgba(240,234,214,.045);
-  color: rgba(240,234,214,.42);
+  min-height: 42px;
+  padding: 9px 10px;
+  border-radius: 13px;
   font-size: 13px;
   font-weight: 600;
+  background: rgba(240,234,214,.035);
+  border: 1px solid transparent;
 }
 .places-tab.active {
-  background: rgba(200,169,126,.11);
-  border-color: rgba(200,169,126,.72);
-  color: var(--amber);
+  border-color: rgba(200,169,126,.75);
+  background: rgba(200,169,126,.105);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
 }
 .places-sort-bar {
   gap: 7px;
-  padding: 0 16px 12px;
+  padding: 0 16px 10px;
 }
 .sort-pill {
-  min-height: 34px;
-  padding: 7px 13px;
+  min-height: 30px;
+  padding: 6px 12px;
   border-radius: 999px;
+  font-size: 11.5px;
   background: rgba(240,234,214,.04);
-  border: 1px solid transparent;
-  color: rgba(240,234,214,.45);
-  font-size: 12px;
-  font-weight: 600;
 }
 .sort-pill.active {
+  border-color: rgba(200,169,126,.75);
   background: rgba(200,169,126,.12);
-  border-color: rgba(200,169,126,.7);
-  color: var(--amber);
 }
 
-/* Place list cards: align to Journey card discipline */
+/* Visited/Bucket place cards: compact and consistent */
 .places-feed {
   gap: 8px;
   padding: 0 16px;
 }
 .place-card {
-  min-height: 92px;
-  padding: 13px;
-  border-radius: 22px;
+  min-height: 84px;
+  padding: 12px 13px;
+  border-radius: 20px;
+  border: 1px solid rgba(200,169,126,.10);
   background: #1B1B1B;
-  border: 1px solid var(--card-border);
-  box-shadow: none;
-  gap: 0;
+  gap: 5px;
+}
+.place-card.wishlist {
+  min-height: 76px;
 }
 .place-card-top {
   align-items: center;
-  gap: 12px;
 }
 .place-card-name-row {
-  align-items: center;
-  gap: 12px;
-}
-.place-card-text {
-  min-width: 0;
-  flex: 1;
-}
-.place-card-name {
-  font-size: 16px;
-  line-height: 1.17;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.place-card-sub {
-  font-size: 12.5px;
-  line-height: 1.25;
-  color: rgba(240,234,214,.43);
-  margin-top: 7px;
-}
-.place-card-meta {
-  margin-top: 10px;
   gap: 10px;
 }
-.place-card-rating {
-  font-size: 25px;
-  font-weight: 300;
-  letter-spacing: -.5px;
-  color: var(--cream);
-  min-width: 42px;
-  text-align: right;
-  line-height: 1;
-}
-.place-card-rating span { display: none !important; }
-.place-last-visit {
-  font-size: 11.5px;
-  color: rgba(240,234,214,.42);
-}
-.place-visit-badge {
-  min-height: 22px;
-  padding: 3px 9px;
-  font-size: 11px;
-  background: rgba(200,169,126,.16);
-}
-
-/* Place/logo placeholders: restaurant defaults should not look like Crust branding */
 .place-card-logo {
-  width: 42px;
-  height: 42px;
-  background: linear-gradient(145deg, rgba(240,234,214,.045), rgba(240,234,214,.016));
-  border: 1px solid rgba(240,234,214,.055);
+  width: 36px;
+  height: 36px;
+  border-color: rgba(240,234,214,.075);
+  background: linear-gradient(145deg, rgba(240,234,214,.045), rgba(240,234,214,.015));
 }
 .place-card-logo--default {
-  padding: 7px;
+  padding: 5px;
 }
 .place-placeholder-svg,
 .destination-placeholder-svg {
   display: block;
-  opacity: .96;
+  opacity: 1;
+  filter: none;
+}
+.place-card-name {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.18;
+}
+.place-card-sub {
+  font-size: 12px;
+  line-height: 1.18;
+  color: rgba(240,234,214,.46);
+  margin-left: 46px;
+}
+.place-card-meta {
+  margin-top: 2px;
+  margin-left: 46px;
+  gap: 10px;
+}
+.place-card-rating {
+  font-size: 22px;
+  line-height: 1;
+  min-width: 36px;
+}
+.place-card-rating span {
+  display: none !important;
+}
+.place-visit-badge {
+  padding: 2.5px 9px;
+  font-size: 10.5px;
+  line-height: 1.2;
+}
+.place-last-visit {
+  font-size: 10.8px;
+  color: rgba(240,234,214,.42);
+}
+.wishlist-badge {
+  padding: 3px 10px;
+  background: rgba(216,90,48,.13);
+  color: rgba(216,90,48,.86);
 }
 
-/* Bucket List */
+/* Bucket list add card: more intentional, less placeholder-like */
 .btn-add-wishlist {
   min-height: 48px;
   padding: 11px 14px;
-  border-radius: 20px;
-  border: 1px dashed rgba(200,169,126,.28);
-  background: rgba(240,234,214,.018);
-  color: rgba(240,234,214,.55);
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: 18px;
+  color: rgba(240,234,214,.58);
+  background: rgba(240,234,214,.025);
+  border-color: rgba(200,169,126,.22);
+  border-style: dashed;
   margin-bottom: 8px;
 }
-.btn-add-wishlist-icon {
-  width: 24px;
-  height: 24px;
+.btn-add-wishlist svg {
+  width: 17px;
+  height: 17px;
+  color: rgba(200,169,126,.9);
+  background: rgba(200,169,126,.12);
   border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--amber);
-  background: rgba(200,169,126,.10);
-  border: 1px solid rgba(200,169,126,.18);
-}
-.bucket-swipe-wrapper {
-  position: relative;
-  overflow: hidden;
-  border-radius: 22px;
-}
-.bucket-swipe-wrapper .place-card {
-  position: relative;
-  z-index: 2;
-  min-height: 86px;
-}
-.bucket-delete-reveal {
-  justify-content: flex-end;
-  padding: 0 18px;
-  background: var(--danger);
-}
-.place-card.wishlist .place-card-sub {
-  margin-top: 9px;
-}
-.wishlist-badge {
-  font-size: 10px;
-  padding: 4px 10px;
-  background: rgba(216,90,48,.15);
-  color: rgba(216,90,48,.92);
+  padding: 2px;
+  box-sizing: content-box;
 }
 
-/* Place detail sheet */
-.place-detail-sheet {
-  border-radius: 24px 24px 0 0;
-}
-.place-detail-topbar {
-  min-height: 52px;
-  padding: 10px 20px 12px;
-}
-.place-detail-scroll {
-  padding: 17px 20px calc(var(--safe-bottom) + 32px);
-}
+/* Place detail sheet refinements */
 .place-detail-header {
   align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
+  gap: 13px;
+  margin-bottom: 16px;
 }
 .place-logo-outer,
 .place-logo-inner {
-  width: 58px;
-  height: 58px;
-}
-.place-logo-inner {
-  background: linear-gradient(145deg, rgba(240,234,214,.045), rgba(240,234,214,.018));
-  border-color: rgba(240,234,214,.065);
+  width: 56px;
+  height: 56px;
 }
 .place-logo-default {
-  padding: 10px;
+  padding: 9px;
 }
 .place-logo-edit-hint {
-  width: 19px;
-  height: 19px;
-  border-color: #1B1B1B;
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
 }
-.place-detail-name {
-  font-size: 22px;
+.place-detail-title-group .place-detail-name {
+  font-size: 21px;
+  font-weight: 650;
   line-height: 1.15;
-  font-weight: 600;
-  margin-bottom: 6px;
 }
-.place-detail-location {
-  font-size: 14px;
+.place-detail-title-group .place-detail-location {
+  font-size: 13px;
   color: rgba(240,234,214,.48);
-  margin-bottom: 0;
 }
 .place-stats-row {
-  gap: 10px;
-  margin-bottom: 22px;
-}
-.place-stats-row--single .place-stat-chip {
-  flex: 0 0 100%;
+  gap: 9px;
+  margin-bottom: 18px;
 }
 .place-stat-chip {
-  min-height: 76px;
-  padding: 13px 12px;
-  border-radius: 18px;
+  min-height: 66px;
+  padding: 12px 10px 10px;
+  border-radius: 16px;
   background: rgba(240,234,214,.035);
   border: 1px solid rgba(240,234,214,.045);
 }
 .place-stat-chip-num {
-  font-size: 28px;
-  font-weight: 300;
+  font-size: 26px;
+  letter-spacing: -.4px;
 }
-.place-stat-chip-label,
-.place-section-label {
-  letter-spacing: 1.15px;
+.place-stat-chip-label {
+  margin-top: 3px;
+  letter-spacing: 1px;
 }
-
-/* Rating history: human-readable, lighter rows */
 .rating-drift {
-  gap: 7px;
-  margin-bottom: 22px;
+  gap: 6px;
+  margin-bottom: 18px;
 }
 .rating-drift-item {
-  min-height: 44px;
-  padding: 10px 13px;
-  border-radius: 14px;
+  min-height: 42px;
+  padding: 9px 13px;
+  border-radius: 13px;
   background: rgba(240,234,214,.035);
-  border: 1px solid rgba(240,234,214,.04);
 }
 .rating-drift-date {
-  font-size: 13px;
-  color: rgba(240,234,214,.50);
+  font-size: 12.5px;
+  color: rgba(240,234,214,.54);
 }
 .rating-drift-val {
-  font-size: 18px;
+  font-size: 17px;
   color: var(--amber);
+}
+.place-section-label {
+  letter-spacing: 1.25px;
+  margin-bottom: 9px;
 }
 .place-visit-history {
-  gap: 8px;
+  gap: 7px;
 }
 
-/* Bucket List detail sheet */
-.wishlist-cta-block {
-  padding: 0 0 14px;
+/* Compact wishlist swipe behavior visuals */
+.swipe-wrapper-wishlist {
+  border-radius: 20px;
 }
-.btn-log-here {
-  min-height: 50px;
-  border-radius: 999px;
-  font-size: 15px;
-}
-.wishlist-empty-note {
-  margin: -6px 0 14px;
-  padding: 13px 14px;
-  border-radius: 16px;
-  background: rgba(240,234,214,.03);
-  border: 1px solid rgba(240,234,214,.045);
-}
-.wishlist-empty-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--cream);
-  margin-bottom: 2px;
-}
-.wishlist-empty-body {
-  font-size: 12px;
-  color: rgba(240,234,214,.42);
-  line-height: 1.45;
-}
-.btn-remove-wishlist {
-  width: 100%;
-  min-height: 42px;
-  border-radius: 999px;
-  border: 1px solid rgba(201,79,50,.42);
-  color: rgba(216,90,48,.94);
-  background: transparent;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 6px;
+.swipe-wrapper-wishlist .swipe-reveal-delete {
+  justify-content: flex-end;
+  padding-right: 18px;
+  gap: 6px;
 }
 
-/* Destinations */
+/* Destination controls and cards */
 .dest-toggle {
-  gap: 8px;
   padding: 0 16px 12px;
+  gap: 8px;
 }
 .dest-toggle-btn {
-  min-height: 42px;
+  min-height: 38px;
   padding: 8px 10px;
-  border-radius: 15px;
+  border-radius: 13px;
+  font-size: 12.5px;
   background: rgba(240,234,214,.035);
-  border: 1px solid rgba(240,234,214,.045);
-  font-size: 13px;
-  font-weight: 600;
 }
 .dest-toggle-btn.active {
-  background: rgba(200,169,126,.11);
-  border-color: rgba(200,169,126,.72);
-  color: var(--amber);
+  border-color: rgba(200,169,126,.75);
+  background: rgba(200,169,126,.105);
 }
 .dest-feed {
   gap: 8px;
   padding: 0 16px;
 }
 .dest-card {
-  min-height: 86px;
+  min-height: 74px;
+  padding: 10px 12px;
   gap: 12px;
-  padding: 11px 12px;
-  border-radius: 22px;
-  border: 1px solid rgba(240,234,214,.035);
+  border-radius: 20px;
+  border: 1px solid rgba(200,169,126,.08);
   background: #1B1B1B;
 }
 .dest-card-photo-wrap,
 .dest-card-photo,
 .dest-card-photo-empty {
-  width: 56px;
-  height: 56px;
+  width: 54px;
+  height: 54px;
   border-radius: 14px;
 }
-.dest-card-photo-wrap {
-  background: linear-gradient(145deg, rgba(240,234,214,.045), rgba(240,234,214,.016));
-  border: 1px solid rgba(240,234,214,.045);
-}
 .dest-card-photo-empty {
+  background: linear-gradient(145deg, rgba(240,234,214,.045), rgba(240,234,214,.015));
+  border: 1px solid rgba(240,234,214,.045);
   font-size: 0;
-  background: transparent;
 }
 .dest-card-name {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.2;
-  margin-bottom: 7px;
+  font-size: 15.5px;
+  font-weight: 650;
+  margin-bottom: 5px;
 }
 .dest-card-meta {
-  gap: 9px;
+  gap: 7px;
 }
 
-/* Destination detail */
+/* Destination details */
 .dest-cover-wrap {
+  margin-bottom: 14px;
+}
+.dest-cover-img {
+  height: 168px;
+  max-height: 168px;
   border-radius: 18px;
-  overflow: hidden;
-  background: rgba(240,234,214,.035);
-  border: 1px solid rgba(240,234,214,.045);
-}
-.dest-cover-img,
-.dest-cover-placeholder {
-  width: 100%;
-  height: 178px;
-  object-fit: cover;
-  object-position: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .dest-cover-placeholder {
-  background: linear-gradient(145deg, rgba(200,169,126,.08), rgba(240,234,214,.025));
+  height: 142px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(200,169,126,.12), rgba(200,169,126,0) 42%),
+    linear-gradient(145deg, rgba(240,234,214,.055), rgba(240,234,214,.018));
+  border: 1px solid rgba(200,169,126,.08);
+  font-size: 0;
+}
+.dest-cover-placeholder .destination-placeholder-svg {
+  width: 42px;
+  height: 42px;
 }
 .dest-cover-change-btn {
-  border-radius: 999px;
-  background: rgba(20,20,20,.74);
-  border: 1px solid rgba(240,234,214,.10);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 6px 11px;
+  font-size: 11.5px;
+  border-color: rgba(240,234,214,.13);
+  background: rgba(16,16,16,.78);
 }
 .dest-best-spot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-radius: 17px;
-  padding: 13px 14px;
+  min-height: 58px;
+  padding: 12px 13px;
+  border-radius: 16px;
   background: rgba(240,234,214,.035);
-  border: 1px solid rgba(240,234,214,.045);
-}
-.dest-best-body {
-  min-width: 0;
+  border: 1px solid rgba(240,234,214,.04);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 12px;
+  align-items: center;
 }
 .dest-best-name {
-  color: var(--amber);
-  font-weight: 600;
-  line-height: 1.2;
-  margin-bottom: 4px;
+  font-size: 14.5px;
+  margin-bottom: 2px;
 }
-.dest-best-rating {
-  font-size: 23px;
-  font-weight: 300;
-  color: var(--cream);
+.dest-best-meta {
+  font-size: 11.5px;
 }
 .dest-spot-row {
-  min-height: 58px;
-  padding: 12px 0;
-  border-bottom-color: rgba(240,234,214,.075);
+  padding: 10px 0;
+  border-bottom-color: rgba(240,234,214,.055);
 }
 .dest-spot-name {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.2;
+  font-size: 13.5px;
+  color: rgba(200,169,126,.92);
 }
 .dest-spot-sub {
-  font-size: 12px;
-  color: rgba(240,234,214,.43);
+  font-size: 10.8px;
 }
 .dest-spot-rating {
-  font-size: 21px;
-  font-weight: 300;
+  font-size: 17px;
+}
+
+/* Bucket detail sheet */
+.wishlist-empty-note {
+  padding: 12px 14px;
+  border-radius: 15px;
+  background: rgba(240,234,214,.035);
+  border: 1px solid rgba(240,234,214,.045);
+  margin: -4px 0 12px;
+}
+.wishlist-empty-title {
+  font-size: 12.5px;
+  font-weight: 650;
   color: var(--cream);
+  margin-bottom: 2px;
+}
+.wishlist-empty-body {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: rgba(240,234,214,.44);
+}
+.btn-remove-wishlist {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid rgba(201,79,50,.38);
+  color: rgba(216,90,48,.88);
+  font: 600 12px var(--font);
+  cursor: pointer;
+}
+.btn-remove-wishlist:active {
+  background: rgba(201,79,50,.08);
+}
+
+/* Wishlist add sheet */
+#wishlist-add-overlay .detail-scroll {
+  padding-top: 14px;
+}
+#wishlist-add-overlay .form-block {
+  margin-bottom: 14px;
+}
+#wishlist-add-overlay .btn-save {
+  min-height: 48px;
 }
