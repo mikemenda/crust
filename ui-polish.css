@@ -946,7 +946,7 @@ textarea.form-input {
   line-height: 1.1;
 }
 
-/* World map teaser: optically align large numbers to globe center */
+/* World map teaser: keep labels below, but lower the stat blocks so the large numbers align with the globe icon */
 .globe-teaser-card {
   padding-top: 15px;
   padding-bottom: 15px;
@@ -965,22 +965,25 @@ textarea.form-input {
   align-items: center;
 }
 .globe-geo-row {
-  align-items: center;
-  transform: translateY(-1px);
+  align-items: flex-start;
+  gap: 18px;
+  transform: none;
 }
 .globe-geo-stat {
-  justify-content: center;
+  justify-content: flex-start;
+  padding-top: 8px;
 }
 .globe-geo-num {
   font-size: 31px;
-  line-height: .92;
+  line-height: .9;
 }
 .globe-geo-label {
-  margin-top: 4px;
+  margin-top: 2px;
   line-height: 1;
 }
 .globe-geo-divider {
-  height: 39px;
+  height: 42px;
+  margin-top: 6px;
 }
 
 /* Placeholder pizza icon: keep direction, make repeated list treatment quieter */
@@ -1129,4 +1132,57 @@ textarea.form-input {
 }
 .style-sheet-options {
   padding-bottom: 10px;
+}
+
+/* ── Final home World Map alignment lock ──────────────────────
+   Keep the globe and the large numbers optically centered together.
+   Labels remain tucked underneath the numbers without pulling the
+   number baseline upward. Scope is Home only. */
+#screen-home .globe-teaser-card {
+  display: flex;
+  align-items: center;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+#screen-home .globe-teaser-icon {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  margin-right: 18px;
+}
+#screen-home .globe-teaser-icon svg {
+  display: block;
+  width: 42px;
+  height: 42px;
+}
+#screen-home .globe-teaser-info {
+  display: flex;
+  align-items: center;
+  align-self: center;
+}
+#screen-home .globe-geo-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  transform: none;
+}
+#screen-home .globe-geo-stat {
+  padding-top: 0;
+  justify-content: flex-start;
+  transform: translateY(7px);
+}
+#screen-home .globe-geo-num {
+  font-size: 31px;
+  line-height: 1;
+}
+#screen-home .globe-geo-label {
+  margin-top: 1px;
+  line-height: 1;
+}
+#screen-home .globe-geo-divider {
+  height: 38px;
+  margin-top: 0;
+  transform: translateY(7px);
 }
