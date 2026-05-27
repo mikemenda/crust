@@ -3140,3 +3140,167 @@ textarea.form-input {
   }
 }
 
+
+
+/* ============================================================
+   CRUST — Feed Refinement V54
+   Scope: Feed landing Apple Photos-style grid + viewer interactions.
+   ============================================================ */
+
+#screen-feed .feed-hero,
+#screen-feed .feed-hero-title {
+  display: none !important;
+}
+
+#screen-feed .feed-controls {
+  padding-top: 2px !important;
+  padding-bottom: 14px !important;
+}
+
+#screen-feed .feed-grid {
+  gap: 5px !important;
+  padding-bottom: 0 !important;
+}
+
+#screen-feed .feed-count-bottom {
+  display: block;
+  text-align: center;
+  margin: 13px 0 0;
+  padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 16px);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .15px;
+  color: rgba(240,234,214,.34);
+}
+
+#screen-feed .feed-cell {
+  border-radius: 15px;
+  border-color: rgba(240,234,214,.055);
+  background: rgba(240,234,214,.025);
+}
+
+#screen-feed .feed-cell::after {
+  opacity: 1;
+  background: linear-gradient(to top,
+    rgba(0,0,0,.68) 0%,
+    rgba(0,0,0,.36) 32%,
+    rgba(0,0,0,0) 70%);
+}
+
+#screen-feed .feed-cell-overlay {
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  opacity: 1;
+  transform: none;
+}
+
+#screen-feed .feed-cell-title {
+  font-size: 10.6px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: .05px;
+  text-shadow: 0 1px 7px rgba(0,0,0,.55);
+}
+
+#screen-feed .feed-cell-meta,
+#screen-feed .feed-cell-tag {
+  display: none !important;
+}
+
+#screen-feed .feed-cell:active .feed-cell-overlay {
+  transform: none;
+}
+
+.feed-photo-overlay .detail-overlay,
+.feed-photo-overlay + .detail-overlay {
+  z-index: 940;
+}
+
+.ifeed-meta {
+  padding: 16px 18px 28px;
+}
+
+.ifeed-post {
+  border-bottom-color: rgba(240,234,214,.08);
+}
+
+.ifeed-rating {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-family: var(--font);
+  font-size: 28px;
+  font-weight: 250;
+  line-height: 1;
+  color: var(--amber);
+  letter-spacing: -.5px;
+  cursor: pointer;
+}
+
+.ifeed-rating:active {
+  opacity: .72;
+  transform: scale(.985);
+}
+
+.ifeed-place {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0 0 5px;
+  max-width: 100%;
+  font-family: var(--font);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--cream);
+  line-height: 1.15;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ifeed-place:active {
+  opacity: .72;
+}
+
+.ifeed-notes {
+  margin-top: 12px;
+  font-size: 13px;
+  color: rgba(240,234,214,.62);
+  line-height: 1.42;
+  padding: 11px 13px;
+  background: rgba(240,234,214,.027);
+  border-color: rgba(240,234,214,.038);
+  border-radius: 15px;
+}
+
+.ifeed-actions {
+  margin-top: 12px;
+}
+
+.ifeed-actions--position-only {
+  justify-content: flex-end;
+}
+
+.ifeed-view-entry {
+  display: none !important;
+}
+
+.ifeed-position {
+  font-size: 11px;
+  color: rgba(240,234,214,.32);
+}
+
+@media (max-width: 380px) {
+  #screen-feed .feed-cell-title {
+    font-size: 9.8px;
+  }
+  .ifeed-meta {
+    padding: 15px 16px 26px;
+  }
+}

@@ -366,7 +366,12 @@ async function openEntry(id) {
 }
 
 function closeEntryDetail() {
-  document.getElementById('entry-detail-overlay').classList.add('hidden');
+  const overlay = document.getElementById('entry-detail-overlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    overlay.style.zIndex = '';
+    delete overlay.dataset.returnTo;
+  }
   _detailVisitId   = null;
   _detailVisitData = null;
 }
@@ -910,8 +915,9 @@ async function openPlace(placeId) {
   const overlay = document.getElementById('place-detail-overlay');
   const body    = document.getElementById('place-detail-body');
   if (!overlay || !body) return;
-  // Ensure place detail always renders above dest detail (both are z-index 600 by class)
-  overlay.style.zIndex = '620';
+  // Ensure place detail renders above destination detail and, when opened from Feed, above Feed viewer.
+  const feedOverlay = document.getElementById('feed-photo-overlay');
+  overlay.style.zIndex = (feedOverlay && !feedOverlay.classList.contains('hidden')) ? '940' : '620';
   overlay.classList.remove('hidden');
   body.innerHTML = '<div style="text-align:center;padding:48px;opacity:.35;font-size:14px;">Loading…</div>';
 
@@ -2643,7 +2649,7 @@ function renderFeedCount(visits) {
   if (!count) return;
   const total = visits.length;
   const active = feedActiveLabel();
-  const photoLabel = total === 1 ? 'photo' : 'photos';
+  const photoLabel = total === 1 ? 'Photo' : 'Photos';
   count.textContent = active ? `${total} ${photoLabel} · ${active}` : `${total} ${photoLabel}`;
 }
 
@@ -2665,19 +2671,13 @@ function renderFeedGrid() {
   }
 
   grid.innerHTML = visits.map((v) => {
-    const loc = [v.city, v.country].filter(Boolean).join(', ');
-    const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
-    const dStr = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const tag = (v.styles || [])[0] || '';
     return `
       <button class="feed-cell" onclick="openFeedPhoto('${v.id}')" aria-label="Open ${esc(v.placeName || 'photo')}">
         <img src="${esc(v.photoUrl)}" loading="lazy" onerror="this.closest('.feed-cell').classList.add('image-error');this.remove();" />
         <div class="feed-cell-fallback">${pizzaPlaceholderSvg(26)}</div>
         <div class="feed-cell-overlay">
           <div class="feed-cell-title">${esc(v.placeName || 'Unknown')}</div>
-          <div class="feed-cell-meta">${esc(loc || dStr || '')}</div>
         </div>
-        ${tag ? `<span class="feed-cell-tag">${esc(tag)}</span>` : ''}
       </button>`;
   }).join('');
 }
@@ -2747,6 +2747,10 @@ function buildIFeedPost(v, idx = 0, total = 0) {
   const tags = (v.styles || []).map(s => `<span class="style-tag">${esc(s)}</span>`).join('');
   const position = total > 1 ? `${idx + 1} of ${total}` : '1 photo';
 
+  const placeAction = v.placeId
+    ? `openFeedPlace('${esc(v.placeId)}')`
+    : `openFeedEntry('${v.id}')`;
+
   return `
     <article class="ifeed-post" id="ifeed-post-${v.id}">
       <div class="ifeed-photo-wrap">
@@ -2755,18 +2759,17 @@ function buildIFeedPost(v, idx = 0, total = 0) {
       </div>
       <div class="ifeed-meta">
         <div class="ifeed-top-row">
-          ${v.rating != null ? `<div class="ifeed-rating">${formatRating(v.rating)}</div>` : '<div></div>'}
+          ${v.rating != null ? `<button class="ifeed-rating" onclick="openFeedEntry('${v.id}')" aria-label="Open entry rated ${formatRating(v.rating)}">${formatRating(v.rating)}</button>` : '<div></div>'}
           ${tags ? `<div class="ifeed-tags">${tags}</div>` : ''}
         </div>
-        <div class="ifeed-place">${esc(v.placeName || 'Unknown')}</div>
+        <button class="ifeed-place" onclick="${placeAction}" aria-label="Open ${esc(v.placeName || 'place')}">${esc(v.placeName || 'Unknown')}</button>
         <div class="ifeed-subline">
           ${loc ? `<span>${esc(loc)}</span>` : ''}
           ${loc && dStr ? '<span class="ifeed-dot">·</span>' : ''}
           ${dStr ? `<span>${dStr}</span>` : ''}
         </div>
         ${v.notes ? `<div class="ifeed-notes">${esc(v.notes)}</div>` : ''}
-        <div class="ifeed-actions">
-          <button class="ifeed-view-entry" onclick="openFeedEntry('${v.id}')">View Entry →</button>
+        <div class="ifeed-actions ifeed-actions--position-only">
           <span class="ifeed-position">${position}</span>
         </div>
       </div>
@@ -2774,8 +2777,16 @@ function buildIFeedPost(v, idx = 0, total = 0) {
 }
 
 function openFeedEntry(id) {
-  closeFeedPhoto();
-  setTimeout(() => openEntry(id), 40);
+  const overlay = document.getElementById('entry-detail-overlay');
+  if (overlay) {
+    overlay.dataset.returnTo = 'feed';
+    overlay.style.zIndex = '940';
+  }
+  openEntry(id);
+}
+
+function openFeedPlace(placeId) {
+  openPlace(placeId);
 }
 
 function closeFeedPhoto() {
