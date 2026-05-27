@@ -880,3 +880,253 @@ textarea.form-input {
   width: 100%;
   min-height: 48px;
 }
+
+/* ============================================================
+   CRUST — Final Cleanup Pass
+   Focus: last alignment, density, log form bottom spacing.
+   ============================================================ */
+
+/* Home stat cards: final compacting */
+#screen-home .stats-grid {
+  gap: 6px;
+  padding-bottom: 12px;
+}
+#screen-home .stat-card:not(.streak) {
+  min-height: 66px;
+  padding: 10px 14px 9px;
+}
+#screen-home .stat-card:not(.streak) .stat-num {
+  font-size: 29px;
+}
+#screen-home .stat-card:not(.streak) .stat-label {
+  margin-bottom: 1px;
+}
+
+/* Streak: make the number + title/date read as one filled stat unit */
+#screen-home .stat-card.streak {
+  min-height: 68px;
+  padding: 11px 16px;
+  gap: 12px;
+}
+#screen-home .streak-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  flex: 0 0 38px;
+}
+#screen-home .streak-icon svg {
+  width: 20px;
+  height: 20px;
+}
+#screen-home .streak-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 1px;
+  align-items: center;
+}
+#screen-home .streak-num {
+  grid-row: 1 / 3;
+  grid-column: 1;
+  font-size: 30px;
+  line-height: .95;
+  align-self: center;
+}
+#screen-home .streak-title {
+  grid-column: 2;
+  align-self: end;
+  margin-top: 0;
+  line-height: 1;
+}
+#screen-home .streak-status {
+  grid-column: 2;
+  align-self: start;
+  margin-top: 2px;
+  line-height: 1.1;
+}
+
+/* World map teaser: optically align large numbers to globe center */
+.globe-teaser-card {
+  padding-top: 15px;
+  padding-bottom: 15px;
+  align-items: center;
+}
+.globe-teaser-icon {
+  width: 52px;
+  justify-content: center;
+}
+.globe-teaser-icon svg {
+  width: 42px;
+  height: 42px;
+}
+.globe-teaser-info {
+  display: flex;
+  align-items: center;
+}
+.globe-geo-row {
+  align-items: center;
+  transform: translateY(-1px);
+}
+.globe-geo-stat {
+  justify-content: center;
+}
+.globe-geo-num {
+  font-size: 31px;
+  line-height: .92;
+}
+.globe-geo-label {
+  margin-top: 4px;
+  line-height: 1;
+}
+.globe-geo-divider {
+  height: 39px;
+}
+
+/* Placeholder pizza icon: keep direction, make repeated list treatment quieter */
+.entry-thumb-placeholder {
+  background: linear-gradient(145deg, rgba(240,234,214,.026), rgba(240,234,214,.010));
+  border-color: rgba(240,234,214,.035);
+}
+.pizza-placeholder-svg {
+  width: 30px;
+  height: 30px;
+  opacity: .88;
+  filter: none;
+}
+
+/* Home/Journey cards: final slight tightening */
+.entry-feed,
+.journey-feed {
+  gap: 6px;
+}
+.entry-card {
+  min-height: 78px;
+  padding: 9px 11px;
+}
+.entry-thumb,
+.entry-thumb-placeholder {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+}
+.entry-place {
+  line-height: 1.1;
+}
+.entry-sub {
+  margin-bottom: 5px;
+}
+.entry-rating-num {
+  font-size: 21px;
+}
+
+/* Swipe: shorter reveal, less panel-like */
+.swipe-reveal {
+  width: 72px;
+  font-size: 10px;
+  gap: 4px;
+}
+.swipe-reveal svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Header utility icons: reduce bubble feel, sharpen icon contrast */
+.app-header .btn-icon[aria-label="World map"],
+.app-header .btn-icon[aria-label="Photo feed"] {
+  width: 34px;
+  height: 34px;
+  background: rgba(240,234,214,.028);
+  border: 1px solid rgba(200,169,126,.16);
+  color: rgba(240,234,214,.84) !important;
+  box-shadow: none;
+}
+.app-header .btn-icon[aria-label="World map"] svg,
+.app-header .btn-icon[aria-label="Photo feed"] svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.85;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Detail sheets: better vertical-photo compromise and tighter no-photo feel */
+.detail-photo {
+  aspect-ratio: 4 / 5;
+  max-height: 44vh;
+  object-fit: cover;
+  object-position: center;
+  margin-bottom: 16px;
+}
+.detail-scroll,
+.place-detail-scroll {
+  padding-top: 14px;
+}
+.detail-meta-item {
+  min-height: 68px;
+}
+
+/* Filter sheets: slightly less tall when content is short */
+.filter-sheet {
+  max-height: min(68vh, 520px);
+}
+.filter-option {
+  min-height: 50px;
+}
+
+/* Log Pizza: align compact rows and lower the save button safely */
+#screen-log .form-block {
+  margin-bottom: 10px;
+}
+#screen-log .form-block--compact {
+  margin-bottom: 10px;
+}
+#screen-log textarea.form-input {
+  min-height: 60px;
+  max-height: 72px;
+}
+.photo-area--compact {
+  min-height: 48px;
+  padding: 0 13px;
+}
+.photo-area-inner {
+  min-height: 48px;
+  align-items: center;
+  gap: 11px;
+}
+.photo-row-icon {
+  width: 25px;
+  height: 25px;
+  font-size: 18px;
+  line-height: 1;
+  margin-top: -1px;
+}
+.photo-row-copy {
+  line-height: 1;
+  transform: translateY(-.5px);
+}
+.photo-row-preview {
+  width: 32px;
+  height: 32px;
+}
+#screen-log .log-footer {
+  bottom: 48px;
+  padding: 2px 20px 4px;
+  background: linear-gradient(180deg, rgba(20,20,20,0), var(--bg) 20%);
+}
+@media all and (display-mode: standalone) {
+  #screen-log .log-footer {
+    bottom: 0;
+    padding-bottom: calc(var(--safe-bottom) + 8px);
+  }
+}
+#screen-log .btn-save {
+  min-height: 48px;
+}
+
+/* Style sheet: avoid orphaned Other chip */
+#style-sheet-options .style-sheet-chip:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.style-sheet-options {
+  padding-bottom: 10px;
+}

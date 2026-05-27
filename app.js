@@ -276,7 +276,7 @@ function entryCard(id, v, context = 'open-entry') {
   const tags = (v.styles || []).slice(0,2).map(s => `<span class="style-tag">${esc(s)}</span>`).join('');
   const thumb = v.photoUrl
     ? `<img src="${esc(v.photoUrl)}" class="entry-thumb" loading="lazy" />`
-    : `<div class="entry-thumb-placeholder" aria-label="No pizza photo">${pizzaPlaceholderSvg(34)}</div>`;
+    : `<div class="entry-thumb-placeholder" aria-label="No pizza photo">${pizzaPlaceholderSvg(30)}</div>`;
   const tapFn = (context === 'open-place' && v.placeId)
     ? `openPlace('${esc(v.placeId)}')`
     : `openEntry('${id}')`;
@@ -652,14 +652,14 @@ function pizzaLogoSvg(size = 20) {
 }
 
 // App-native placeholder for pizza entries without an uploaded photo.
-function pizzaPlaceholderSvg(size = 34) {
+function pizzaPlaceholderSvg(size = 30) {
   return `<svg class="pizza-placeholder-svg" viewBox="0 0 64 64" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M14.5 13.5c13.9 1 26.7 6.4 37.5 15.9L26.7 54.7C18.9 43.5 14.8 29.6 14.5 13.5Z" fill="none" stroke="#C8A97E" stroke-width="3.4" stroke-linejoin="round"/>
-    <path d="M14.7 13.6c13.8 1.1 26.5 6.4 37.1 15.8" fill="none" stroke="#E6D1A9" stroke-width="4.2" stroke-linecap="round"/>
-    <path d="M21.5 24.4c7.7 1.9 14.6 5.2 20.4 9.7" fill="none" stroke="rgba(240,234,214,.48)" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="29" cy="33" r="2.6" fill="#D85A30"/>
-    <circle cx="36.8" cy="40.4" r="2.3" fill="#D85A30"/>
-    <circle cx="25.8" cy="44.6" r="2.1" fill="#D85A30"/>
+    <path d="M15 14c13.8 1.1 26.4 6.4 37 15.6L26.8 54.8C19.2 43.8 15.3 30.2 15 14Z" fill="none" stroke="#B99A72" stroke-width="2.8" stroke-linejoin="round"/>
+    <path d="M15.4 14.2c13.3 1.2 25.5 6.3 35.7 15.1" fill="none" stroke="#E7D3AA" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M22.4 25.2c6.9 1.9 13.2 5 18.7 9.1" fill="none" stroke="#8E7A61" stroke-width="1.8" stroke-linecap="round" opacity=".7"/>
+    <circle cx="29.2" cy="33.4" r="2.2" fill="#D85A30" opacity=".86"/>
+    <circle cx="36.7" cy="40.2" r="2.0" fill="#D85A30" opacity=".78"/>
+    <circle cx="26.1" cy="44.1" r="1.85" fill="#D85A30" opacity=".74"/>
   </svg>`;
 }
 
@@ -1608,7 +1608,7 @@ function initSwipeCards() {
 
     let startX = 0, startY = 0, dx = 0;
     let dragging = false, isScrolling = false;
-    const TRIGGER = 54; // px to trigger action
+    const TRIGGER = 44; // px to trigger action
 
     wrapper.addEventListener('touchstart', e => {
       if (_openSwipeWrapper && _openSwipeWrapper !== wrapper) resetAllSwipes();
@@ -1632,7 +1632,7 @@ function initSwipeCards() {
       if (isScrolling) return;
       e.preventDefault(); // prevent page scroll during horizontal swipe
       dx = moveX;
-      const clamped = Math.max(-72, Math.min(72, dx));
+      const clamped = Math.max(-58, Math.min(58, dx));
       card.style.transform = `translateX(${clamped}px)`;
     }, { passive: false });
 
