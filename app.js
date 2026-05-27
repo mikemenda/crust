@@ -1921,66 +1921,98 @@ function buildPizzaChart(styleData, totalPies) {
   const total = styleData.reduce((s, d) => s + d.count, 0);
   if (!total) return '';
 
-  const cx = 120;
-  const cy = 120;
-  const radius = 72;
-  const stroke = 24;
-  const gap = styleData.length === 1 ? 0 : 0.9;
-  let offset = 0;
+  const cx = 160;
+  const cy = 150;
+  const radius = 76;
+  const stroke = 22;
+  const labelRadius = 124;
+  const leaderInner = radius + stroke / 2 + 5;
+  const leaderOuter = radius + stroke / 2 + 17;
+  const gapDeg = styleData.length === 1 ? 0 : 1.2;
+  let angle = -90;
+
+  const polar = (r, deg) => {
+    const rad = (deg * Math.PI) / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  };
+
+  const arcPath = (startDeg, endDeg) => {
+    const start = polar(radius, startDeg);
+    const end = polar(radius, endDeg);
+    const largeArc = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+    return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+  };
 
   const segments = styleData.map((d, i) => {
     const frac = d.count / total;
-    const pct = frac * 100;
-    const dash = Math.max(0, pct - gap);
-    const seg = {
+    const sweep = frac * 360;
+    const start = angle + gapDeg / 2;
+    const end = angle + sweep - gapDeg / 2;
+    const mid = angle + sweep / 2;
+    angle += sweep;
+
+    const anchor = polar(labelRadius, mid);
+    const side = anchor.x >= cx ? 'right' : 'left';
+    const labelX = side === 'right' ? Math.min(306, anchor.x + 8) : Math.max(14, anchor.x - 8);
+    const labelY = Math.max(24, Math.min(282, anchor.y));
+    const p1 = polar(leaderInner, mid);
+    const p2 = polar(leaderOuter, mid);
+    const elbowX = side === 'right' ? labelX - 5 : labelX + 5;
+
+    return {
       label: d.label,
       count: d.count,
-      frac,
-      pct: Math.round(pct),
+      pct: Math.round(frac * 100),
       color: STYLE_COLORS[d.label] || '#777',
-      dash,
-      offset: offset + (gap / 2),
+      start,
+      end,
+      mid,
+      side,
+      labelX,
+      labelY,
+      p1,
+      p2,
+      elbowX,
       delay: i * 55,
     };
-    offset += pct;
-    return seg;
   });
 
   const rings = segments.map(s => `
-    <circle
+    <path
       class="style-ring-segment"
-      cx="${cx}"
-      cy="${cy}"
-      r="${radius}"
+      d="${arcPath(s.start, s.end)}"
       fill="none"
       stroke="${s.color}"
       stroke-width="${stroke}"
-      pathLength="100"
-      stroke-dasharray="${s.dash} ${100 - s.dash}"
-      stroke-dashoffset="${-s.offset}"
-      transform="rotate(-90 ${cx} ${cy})"
       style="--delay:${s.delay}ms;"
     />
   `).join('');
 
-  const legend = segments.map(s => `
-    <div class="donut-legend-item">
-      <div class="donut-dot" style="background:${s.color}"></div>
-      <span class="donut-lbl">${esc(s.label)}</span>
-      <span class="donut-cnt">${s.pct}% <span class="donut-cnt-small">(${s.count})</span></span>
-    </div>
+  const labels = segments.map(s => `
+    <g class="style-ring-callout" style="--delay:${s.delay + 120}ms;">
+      <polyline
+        class="style-ring-leader"
+        points="${s.p1.x.toFixed(1)},${s.p1.y.toFixed(1)} ${s.p2.x.toFixed(1)},${s.p2.y.toFixed(1)} ${s.elbowX.toFixed(1)},${s.labelY.toFixed(1)}"
+      />
+      <text
+        x="${s.labelX.toFixed(1)}"
+        y="${s.labelY.toFixed(1)}"
+        class="style-ring-callout-text"
+        text-anchor="${s.side === 'right' ? 'start' : 'end'}"
+      >${esc(s.label)}, ${s.pct}%</text>
+    </g>
   `).join('');
 
   return `
-    <div class="style-breakdown-chart">
+    <div class="style-breakdown-chart style-breakdown-chart--callouts">
       <div class="style-ring-wrap">
-        <svg viewBox="0 0 240 240" class="style-ring-svg" aria-label="Pizza style breakdown chart">
+        <svg viewBox="0 0 320 300" class="style-ring-svg style-ring-svg--callouts" aria-label="Pizza style breakdown chart">
           <defs>
             <filter id="styleRingGlow" x="-25%" y="-25%" width="150%" height="150%">
-              <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="rgba(0,0,0,0.34)"/>
+              <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="rgba(0,0,0,0.28)"/>
             </filter>
             <radialGradient id="styleRingCenter" cx="50%" cy="35%" r="70%">
-              <stop offset="0%" stop-color="rgba(255,255,255,0.045)"/>
+              <stop offset="0%" stop-color="rgba(255,255,255,0.04)"/>
               <stop offset="100%" stop-color="rgba(0,0,0,0.12)"/>
             </radialGradient>
           </defs>
@@ -1988,13 +2020,13 @@ function buildPizzaChart(styleData, totalPies) {
           <g filter="url(#styleRingGlow)">
             ${rings}
           </g>
-          <circle class="style-ring-inner" cx="${cx}" cy="${cy}" r="46" />
-          <circle class="style-ring-inner-highlight" cx="${cx}" cy="${cy}" r="39" fill="url(#styleRingCenter)" />
+          <circle class="style-ring-inner" cx="${cx}" cy="${cy}" r="47" />
+          <circle class="style-ring-inner-highlight" cx="${cx}" cy="${cy}" r="40" fill="url(#styleRingCenter)" />
           <text x="${cx}" y="${cy - 2}" class="style-ring-total" text-anchor="middle">${totalPies}</text>
           <text x="${cx}" y="${cy + 23}" class="style-ring-label" text-anchor="middle">PIZZAS</text>
+          ${labels}
         </svg>
       </div>
-      <div class="donut-legend">${legend}</div>
     </div>
   `;
 }
