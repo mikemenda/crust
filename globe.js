@@ -18,6 +18,8 @@ let _lastMapCenter    = { lat: 18, lng: -66 };
 let _lastMapZoom      = 2;
 let _globeHomePoint   = { lat: 18, lng: -66 };
 let _globeAutoSwitchTimer = null;
+let _worldAutoSwitchBlockedUntil = 0; // prevents globe/map bounce loops during handoff animations
+let _mapZoomGestureStartZoom = null;  // used to detect intentional zoom-out before auto-returning to globe
 
 let _currentGlobePinPlace = null;
 
@@ -138,8 +140,20 @@ function getCurrentGlobeDistance() {
   return Infinity;
 }
 
+
+function blockWorldAutoSwitch(ms = 1200) {
+  _worldAutoSwitchBlockedUntil = Date.now() + ms;
+  clearTimeout(_globeAutoSwitchTimer);
+}
+
+function worldAutoSwitchBlocked() {
+  return Date.now() < _worldAutoSwitchBlockedUntil;
+}
+
 function transitionGlobeToMap(centerOverride = null) {
-  if (_isViewTransitioning || _activeView === 'map') return;
+  if (_isViewTransitioning || _activeView === 'map' || worldAutoSwitchBlocked()) return;
+  closeGlobePopup();
+  blockWorldAutoSwitch(1050);
   const mapContainer   = document.getElementById('globe-container');
   const globeContainer = document.getElementById('globe-gl-container');
 
@@ -162,6 +176,7 @@ function transitionGlobeToMap(centerOverride = null) {
   const finish = () => {
     _activeView = 'map';
     syncWorldViewToggle('map');
+    blockWorldAutoSwitch(950);
     if (_mapInstance) {
       _mapInstance.resize();
       _mapInstance.easeTo({ center, zoom: targetZoom, duration: 220, essential: true });
@@ -185,6 +200,9 @@ function transitionGlobeToMap(centerOverride = null) {
 
 function transitionMapToGlobe(centerOverride = null) {
   if (_isViewTransitioning || _activeView === 'globe') return;
+  closeGlobePopup();
+  blockWorldAutoSwitch(1800);
+  try { if (_mapInstance && _mapInstance.stop) _mapInstance.stop(); } catch (_) {}
   const mapContainer   = document.getElementById('globe-container');
   const globeContainer = document.getElementById('globe-gl-container');
 
@@ -199,6 +217,7 @@ function transitionMapToGlobe(centerOverride = null) {
   const finish = () => {
     _activeView = 'globe';
     syncWorldViewToggle('globe');
+    blockWorldAutoSwitch(1700);
     if (_globeGLInstance) {
       _globeGLInstance.controls().autoRotate = true;
       try { _globeGLInstance.pointOfView({ lat: center.lat, lng: center.lng, altitude: 2.0 }, 650); } catch (_) {}
@@ -213,7 +232,7 @@ function transitionMapToGlobe(centerOverride = null) {
       fadeWorldView(mapContainer, globeContainer, finish);
     });
   } else {
-    try { _globeGLInstance.pointOfView({ lat: center.lat, lng: center.lng, altitude: 1.05 }, 1); } catch (_) {}
+    try { _globeGLInstance.pointOfView({ lat: center.lat, lng: center.lng, altitude: 1.85 }, 1); } catch (_) {}
     fadeWorldView(mapContainer, globeContainer, finish);
   }
 }
@@ -234,7 +253,7 @@ function switchGlobeView(view) {
 function scheduleGlobeZoomCheck() {
   clearTimeout(_globeAutoSwitchTimer);
   _globeAutoSwitchTimer = setTimeout(() => {
-    if (_activeView !== 'globe' || _isViewTransitioning || !_globeGLInstance) return;
+    if (_activeView !== 'globe' || _isViewTransitioning || worldAutoSwitchBlocked() || !_globeGLInstance) return;
     const dist = getCurrentGlobeDistance();
     // Globe.gl camera distance is roughly 300 at the default altitude of 2.0.
     // Around 245 makes the handoff happen earlier, before the globe feels over-zoomed.
@@ -533,9 +552,20 @@ async function initMapView(initialCenter = [-70, 18], initialZoom = 2, onReady =
       _lastMapZoom = _mapInstance.getZoom();
     });
 
+    _mapInstance.on('zoomstart', () => {
+      if (!_mapInstance) return;
+      _mapZoomGestureStartZoom = _mapInstance.getZoom();
+    });
+
     _mapInstance.on('zoomend', () => {
-      if (_activeView !== 'map' || _isViewTransitioning || !_mapInstance) return;
-      if (_mapInstance.getZoom() <= 1.75) transitionMapToGlobe();
+      if (_activeView !== 'map' || _isViewTransitioning || worldAutoSwitchBlocked() || !_mapInstance) return;
+      const z = _mapInstance.getZoom();
+      const startZ = Number.isFinite(_mapZoomGestureStartZoom) ? _mapZoomGestureStartZoom : z;
+      const activelyZoomedOut = z < startZ - 0.18;
+      _mapZoomGestureStartZoom = null;
+      // Natural escape hatch: when the user intentionally pinches/zooms out far enough,
+      // return to the 3D globe. The manual Map/Globe toggle remains the reliable shortcut.
+      if (activelyZoomedOut && z <= 2.15) transitionMapToGlobe();
     });
 
   } catch (e) {
@@ -968,7 +998,7 @@ function showGlobePopup(d) {
     <div class="globe-popup-name">${esc(d.name)}</div>
     <div class="globe-popup-loc">${[d.city, d.country].filter(Boolean).map(s => esc(s)).join(' · ')}</div>
     <div class="globe-popup-meta">
-      ${avg ? `<div class="globe-popup-rating">${avg}<span> / 10</span></div>` : ''}
+      ${avg ? `<div class="globe-popup-rating">${avg}</div>` : ''}
       <div class="globe-popup-visits">${d.visitCount} ${d.visitCount === 1 ? 'visit' : 'visits'}</div>
     </div>
   `;
