@@ -2532,3 +2532,84 @@ textarea.form-input {
   font-size: 11px;
   line-height: 1.25;
 }
+
+/* ============================================================
+   CRUST — Passport V50 Year in Review Grid
+   Focus: 4-card yearly recap, tighter carousel controls, swipe-friendly shell.
+   ============================================================ */
+
+#screen-passport .pp-yir-shell {
+  padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 18px) !important;
+  touch-action: pan-y;
+}
+
+#screen-passport .pp-yir-switcher {
+  grid-template-columns: 38px 1fr 38px !important;
+  gap: 7px !important;
+  margin-bottom: 8px !important;
+}
+
+#screen-passport .pp-yir-current-year {
+  min-height: 38px !important;
+  border-radius: 15px !important;
+  font-size: 19px !important;
+  background: rgba(240,234,214,.032) !important;
+  border-color: rgba(200,169,126,.13) !important;
+}
+
+#screen-passport .pp-yir-arrow {
+  height: 38px !important;
+  border-radius: 15px !important;
+  font-size: 25px !important;
+  background: rgba(240,234,214,.032) !important;
+  border-color: rgba(200,169,126,.13) !important;
+}
+
+#screen-passport .pp-yir-arrow:disabled {
+  opacity: .22 !important;
+}
+
+#screen-passport .pp-yir-grid--new {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  padding: 0 !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-card {
+  min-height: 102px !important;
+  padding: 13px 12px 12px !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(240,234,214,.045) !important;
+  background: rgba(240,234,214,.035) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-value,
+#screen-passport .pp-yir-grid--new .pp-yir-snapshot .pp-yir-value {
+  font-size: 16.5px !important;
+  line-height: 1.14 !important;
+  font-weight: 600 !important;
+  letter-spacing: -.25px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-label {
+  margin-top: 8px !important;
+  font-size: 8.8px !important;
+  line-height: 1.05 !important;
+  letter-spacing: .95px !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-sub {
+  margin-top: 5px !important;
+  font-size: 10.4px !important;
+  line-height: 1.18 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}

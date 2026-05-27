@@ -2291,7 +2291,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     ` : ''}
 
     <div class="pp-section-label" style="margin-top:4px;">Year in Review</div>
-    <div class="pp-yir-shell">
+    <div class="pp-yir-shell" id="passport-yir-shell">
       <div class="pp-yir-switcher">
         <button class="pp-yir-arrow" onclick="passportChangeYear(1)" aria-label="Previous year">‹</button>
         <div class="pp-yir-current-year" id="passport-yir-current-year">${_passportYearOrder[_passportYearIndex] || currentYear}</div>
@@ -2302,6 +2302,9 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
       </div>
     </div>
   `;
+
+  updatePassportYearControls();
+  initPassportYearReviewGestures();
 }
 
 
@@ -2309,19 +2312,27 @@ function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (
   if (!data) return '';
   const topSpot = data.topSpot;
   const topStyle = data.topStyle;
-  const snapshot = `${data.visits.length} ${data.visits.length === 1 ? 'pie' : 'pies'} · ${data.spots} ${data.spots === 1 ? 'spot' : 'spots'} · ${data.cities} ${data.cities === 1 ? 'city' : 'cities'} · ${data.countries} ${data.countries === 1 ? 'country' : 'countries'}`;
+  const pieLabel = data.visits.length === 1 ? 'pie' : 'pies';
+  const spotLabel = data.spots === 1 ? 'spot' : 'spots';
+  const cityLabel = data.cities === 1 ? 'city' : 'cities';
+  const countryLabel = data.countries === 1 ? 'country' : 'countries';
   return `
-    <div class="pp-yir-card pp-yir-full pp-yir-snapshot">
-      <div class="pp-yir-value pp-yir-name">${snapshot}</div>
-      <div class="pp-yir-label">Snapshot</div>
+    <div class="pp-yir-card pp-yir-snapshot">
+      <div class="pp-yir-value pp-yir-name">${data.visits.length} ${pieLabel} · ${data.spots} ${spotLabel}</div>
+      <div class="pp-yir-label">Pizzas</div>
       <div class="pp-yir-sub">Year in Review</div>
     </div>
-    <div class="pp-yir-card pp-yir-full">
+    <div class="pp-yir-card pp-yir-snapshot">
+      <div class="pp-yir-value pp-yir-name">${data.cities} ${cityLabel} · ${data.countries} ${countryLabel}</div>
+      <div class="pp-yir-label">Destinations</div>
+      <div class="pp-yir-sub">Year in Review</div>
+    </div>
+    <div class="pp-yir-card">
       <div class="pp-yir-value pp-yir-name">${topSpot ? esc(topSpot.name) : '—'}</div>
       <div class="pp-yir-label">Top Rated Spot</div>
       <div class="pp-yir-sub">${topSpot ? `Avg: ${scoreLabel(topSpot.avg)} · Visits: ${topSpot.count}` : 'No rated spots this year'}</div>
     </div>
-    <div class="pp-yir-card pp-yir-full">
+    <div class="pp-yir-card">
       <div class="pp-yir-value pp-yir-name">${topStyle ? esc(topStyle.label) : '—'}</div>
       <div class="pp-yir-label">Top Rated Style</div>
       <div class="pp-yir-sub">${topStyle ? `Avg: ${scoreLabel(topStyle.avg)} · Pies: ${topStyle.count}` : 'No style ratings this year'}</div>
@@ -2329,17 +2340,56 @@ function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (
   `;
 }
 
-function passportChangeYear(delta) {
-  if (!_passportYearOrder.length) return;
-  _passportYearIndex = Math.max(0, Math.min(_passportYearOrder.length - 1, _passportYearIndex + delta));
-  const year = _passportYearOrder[_passportYearIndex];
+function updatePassportYearControls() {
   const label = document.getElementById('passport-yir-current-year');
-  const content = document.getElementById('passport-yir-content');
-  if (label) label.textContent = year;
-  if (content) content.innerHTML = buildPassportYearReviewHtml(_passportYearStats[year]);
+  const year = _passportYearOrder[_passportYearIndex];
+  if (label && year) label.textContent = year;
   document.querySelectorAll('.pp-yir-arrow').forEach((btn, idx) => {
     btn.disabled = idx === 0 ? _passportYearIndex >= _passportYearOrder.length - 1 : _passportYearIndex <= 0;
   });
+}
+
+function initPassportYearReviewGestures() {
+  const shell = document.getElementById('passport-yir-shell');
+  if (!shell || shell.dataset.swipeReady === '1') return;
+  shell.dataset.swipeReady = '1';
+
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+
+  shell.addEventListener('touchstart', (e) => {
+    if (!e.touches || e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  shell.addEventListener('touchend', (e) => {
+    if (!tracking || !e.changedTouches || !e.changedTouches.length) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    passportChangeYear(dx < 0 ? 1 : -1);
+  }, { passive: true });
+}
+
+function passportChangeYear(delta) {
+  if (!_passportYearOrder.length || !delta) {
+    updatePassportYearControls();
+    return;
+  }
+  const nextIndex = Math.max(0, Math.min(_passportYearOrder.length - 1, _passportYearIndex + delta));
+  if (nextIndex === _passportYearIndex) {
+    updatePassportYearControls();
+    return;
+  }
+  _passportYearIndex = nextIndex;
+  const year = _passportYearOrder[_passportYearIndex];
+  const content = document.getElementById('passport-yir-content');
+  if (content) content.innerHTML = buildPassportYearReviewHtml(_passportYearStats[year]);
+  updatePassportYearControls();
 }
 
 function buildPizzaChart(styleData, totalPies) {
