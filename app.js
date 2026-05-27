@@ -695,8 +695,7 @@ function formatDisplayDate(value, opts = { month: 'short', day: 'numeric', year:
 
 function formatRating(value) {
   if (value == null || value === '' || isNaN(Number(value))) return '—';
-  const n = Number(value);
-  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, '');
+  return Number(value).toFixed(1);
 }
 
 function avgRating(ratingHistory) {
@@ -2012,6 +2011,10 @@ const STYLE_COLORS = {
 
 // ── PASSPORT ──────────────────────────────────────────────────
 
+let _passportYearOrder = [];
+let _passportYearIndex = 0;
+let _passportYearStats = {};
+
 async function loadPassport() {
   if (!currentUser) return;
   const body = document.getElementById('passport-body');
@@ -2098,13 +2101,13 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     .filter(p => p.ratingHistory?.length)
     .map(p => ({ ...p, avg: avgRating(p.ratingHistory) }))
     .sort((a, b) => b.avg - a.avg || (b.visitCount || 0) - (a.visitCount || 0))
-    .slice(0, 10);
+    .slice(0, 5);
 
   // Most visited / Repeat favorite
   const hof = places
     .filter(p => (p.visitCount || 0) > 0)
     .sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0) || (avgRating(b.ratingHistory) - avgRating(a.ratingHistory)))
-    .slice(0, 10);
+    .slice(0, 5);
   const repeatFavorite = hof[0] || null;
 
   // Pies by year
@@ -2134,30 +2137,39 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
   });
   const bestMonth = Object.values(monthCounts).sort((a, b) => b.count - a.count)[0];
 
+  const buildYearReviewStats = (year) => {
+    const yearVisits = visits.filter(v => {
+      const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+      return !isNaN(d) && d.getFullYear() === Number(year);
+    });
+    const ySpots = new Set(yearVisits.map(v => v.placeId).filter(Boolean)).size;
+    const yCities = new Set(yearVisits.map(v => v.city).filter(Boolean)).size;
+    const yCountries = new Set(yearVisits.map(v => v.country).filter(Boolean)).size;
+
+    const yPlaceCount = {};
+    yearVisits.forEach(v => {
+      if (!v.placeId) return;
+      if (!yPlaceCount[v.placeId]) yPlaceCount[v.placeId] = { count: 0, name: v.placeName || 'Unknown' };
+      yPlaceCount[v.placeId].count++;
+    });
+    const yTopSpot = Object.values(yPlaceCount).sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name)))[0] || null;
+
+    const yStyleRatings = {};
+    yearVisits.filter(v => v.rating != null && !isNaN(Number(v.rating))).forEach(v => (v.styles || []).forEach(style => {
+      if (!yStyleRatings[style]) yStyleRatings[style] = { label: style, count: 0, total: 0 };
+      yStyleRatings[style].count++;
+      yStyleRatings[style].total += Number(v.rating);
+    }));
+    const yTopStyle = bestByAverage(yStyleRatings);
+    return { year: String(year), visits: yearVisits, spots: ySpots, cities: yCities, countries: yCountries, topSpot: yTopSpot, topStyle: yTopStyle };
+  };
+
   const currentYear = new Date().getFullYear();
-  const currentYearVisits = visits.filter(v => {
-    const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
-    return !isNaN(d) && d.getFullYear() === currentYear;
-  });
-  const cySpots = new Set(currentYearVisits.map(v => v.placeId).filter(Boolean)).size;
-  const cyCities = new Set(currentYearVisits.map(v => v.city).filter(Boolean)).size;
-  const cyCountries = new Set(currentYearVisits.map(v => v.country).filter(Boolean)).size;
-
-  const tyPlaceCount = {};
-  currentYearVisits.forEach(v => {
-    if (!v.placeId) return;
-    if (!tyPlaceCount[v.placeId]) tyPlaceCount[v.placeId] = { count: 0, name: v.placeName };
-    tyPlaceCount[v.placeId].count++;
-  });
-  const topSpot = Object.values(tyPlaceCount).sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name)))[0];
-
-  const tyStyleRatings = {};
-  currentYearVisits.filter(v => v.rating != null && !isNaN(Number(v.rating))).forEach(v => (v.styles || []).forEach(style => {
-    if (!tyStyleRatings[style]) tyStyleRatings[style] = { label: style, count: 0, total: 0 };
-    tyStyleRatings[style].count++;
-    tyStyleRatings[style].total += Number(v.rating);
-  }));
-  const topYearStyle = bestByAverage(tyStyleRatings);
+  _passportYearOrder = yearKeys.length ? [...yearKeys] : [String(currentYear)];
+  const currentYearIdx = _passportYearOrder.indexOf(String(currentYear));
+  _passportYearIndex = currentYearIdx >= 0 ? currentYearIdx : 0;
+  _passportYearStats = {};
+  _passportYearOrder.forEach(yr => { _passportYearStats[yr] = buildYearReviewStats(yr); });
 
   body.innerHTML = `
     <div class="pp-section-label">Lifetime</div>
@@ -2184,19 +2196,19 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     <div class="pp-section-label">Taste Profile</div>
     <div class="pp-insight-grid">
       <div class="pp-insight-card">
-        <div class="pp-insight-value">${ratedVisits.length ? scoreLabel(avgLife) : '—'}</div>
-        <div class="pp-insight-label">Avg Rating</div>
-        <div class="pp-insight-sub">${plural(ratedVisits.length, 'rated pie')}</div>
-      </div>
-      <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedStyle ? esc(topRatedStyle.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated Style</div>
-        <div class="pp-insight-sub">${topRatedStyle ? `Avg ${scoreLabel(topRatedStyle.avg)} · ${plural(topRatedStyle.count, 'pie')}` : 'No style ratings yet'}</div>
+        <div class="pp-insight-sub">${topRatedStyle ? `Avg: ${scoreLabel(topRatedStyle.avg)} · Pies: ${topRatedStyle.count}` : 'No style ratings yet'}</div>
+      </div>
+      <div class="pp-insight-card">
+        <div class="pp-insight-value">${ratedVisits.length ? scoreLabel(avgLife) : '—'}</div>
+        <div class="pp-insight-label">Avg Rating</div>
+        <div class="pp-insight-sub">Pies rated: ${ratedVisits.length}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedCity ? esc(topRatedCity.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated City</div>
-        <div class="pp-insight-sub">${topRatedCity ? `Avg ${scoreLabel(topRatedCity.avg)} · ${plural(topRatedCity.count, 'pie')}` : 'No city ratings yet'}</div>
+        <div class="pp-insight-sub">${topRatedCity ? `Avg: ${scoreLabel(topRatedCity.avg)} · Pies: ${topRatedCity.count}` : 'No city ratings yet'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${explorerPct}%</div>
@@ -2209,9 +2221,9 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
         <div class="pp-insight-sub">${repeatFavorite ? plural(repeatFavorite.visitCount || 0, 'visit') : 'No repeats yet'}</div>
       </div>
       <div class="pp-insight-card">
-        <div class="pp-insight-value">${perfectCount || '—'}</div>
-        <div class="pp-insight-label">Perfect Scores</div>
-        <div class="pp-insight-sub">${perfectCount ? `${plural(perfectCount, '10/10 pie')}` : 'Still chasing a perfect pie'}</div>
+        <div class="pp-insight-value">${styleData.length}</div>
+        <div class="pp-insight-label">Styles Tried</div>
+        <div class="pp-insight-sub">${plural(styleData.length, 'style')} logged</div>
       </div>
     </div>
 
@@ -2267,34 +2279,55 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     ` : ''}
 
     <div class="pp-section-label" style="margin-top:4px;">Year in Review</div>
-    <div class="pp-yir-grid pp-yir-grid--new">
-      <div class="pp-yir-card pp-yir-full pp-yir-snapshot">
-        <div class="pp-yir-value">${currentYear} Snapshot</div>
-        <div class="pp-yir-label">This Year</div>
-        <div class="pp-yir-sub">${currentYearVisits.length} pies · ${cySpots} spots · ${cyCities} cities · ${cyCountries} countries</div>
+    <div class="pp-yir-shell">
+      <div class="pp-yir-switcher">
+        <button class="pp-yir-arrow" onclick="passportChangeYear(1)" aria-label="Previous year">‹</button>
+        <div class="pp-yir-current-year" id="passport-yir-current-year">${_passportYearOrder[_passportYearIndex] || currentYear}</div>
+        <button class="pp-yir-arrow" onclick="passportChangeYear(-1)" aria-label="Next year">›</button>
       </div>
-      <div class="pp-yir-card">
-        <div class="pp-yir-value">${bestYear || '—'}</div>
-        <div class="pp-yir-label">Best Year</div>
-        <div class="pp-yir-sub">${bestYear ? `${byYear[bestYear]} pies` : ''}</div>
-      </div>
-      <div class="pp-yir-card">
-        <div class="pp-yir-value">${bestMonth?.monthOnly || '—'}</div>
-        <div class="pp-yir-label">Top Month</div>
-        <div class="pp-yir-sub">${bestMonth ? `${bestMonth.count} pies · ${bestMonth.label}` : ''}</div>
-      </div>
-      <div class="pp-yir-card pp-yir-full">
-        <div class="pp-yir-value pp-yir-name">${topSpot ? esc(topSpot.name) : '—'}</div>
-        <div class="pp-yir-label">${currentYear} Top Spot</div>
-        <div class="pp-yir-sub">${topSpot ? `${topSpot.count} ${topSpot.count === 1 ? 'visit' : 'visits'} this year` : 'No visits logged this year'}</div>
-      </div>
-      <div class="pp-yir-card pp-yir-full">
-        <div class="pp-yir-value pp-yir-name">${topYearStyle ? esc(topYearStyle.label) : '—'}</div>
-        <div class="pp-yir-label">${currentYear} Top Rated Style</div>
-        <div class="pp-yir-sub">${topYearStyle ? `Avg ${scoreLabel(topYearStyle.avg)} · ${plural(topYearStyle.count, 'pie')} this year` : 'No style ratings this year'}</div>
+      <div class="pp-yir-grid pp-yir-grid--new" id="passport-yir-content">
+        ${buildPassportYearReviewHtml(_passportYearStats[_passportYearOrder[_passportYearIndex]], scoreLabel, plural)}
       </div>
     </div>
   `;
+}
+
+
+function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (n, word) => `${n} ${word}${Number(n) === 1 ? '' : 's'}`) {
+  if (!data) return '';
+  const year = data.year;
+  const topSpot = data.topSpot;
+  const topStyle = data.topStyle;
+  return `
+    <div class="pp-yir-card pp-yir-full pp-yir-snapshot">
+      <div class="pp-yir-value">${year} Snapshot</div>
+      <div class="pp-yir-label">Year in Review</div>
+      <div class="pp-yir-sub">${data.visits.length} pies · ${data.spots} spots · ${data.cities} cities · ${data.countries} countries</div>
+    </div>
+    <div class="pp-yir-card pp-yir-full">
+      <div class="pp-yir-value pp-yir-name">${topSpot ? esc(topSpot.name) : '—'}</div>
+      <div class="pp-yir-label">${year} Top Spot</div>
+      <div class="pp-yir-sub">${topSpot ? `${topSpot.count} ${topSpot.count === 1 ? 'visit' : 'visits'} this year` : 'No visits logged this year'}</div>
+    </div>
+    <div class="pp-yir-card pp-yir-full">
+      <div class="pp-yir-value pp-yir-name">${topStyle ? esc(topStyle.label) : '—'}</div>
+      <div class="pp-yir-label">${year} Top Rated Style</div>
+      <div class="pp-yir-sub">${topStyle ? `Avg: ${scoreLabel(topStyle.avg)} · Pies: ${topStyle.count}` : 'No style ratings this year'}</div>
+    </div>
+  `;
+}
+
+function passportChangeYear(delta) {
+  if (!_passportYearOrder.length) return;
+  _passportYearIndex = Math.max(0, Math.min(_passportYearOrder.length - 1, _passportYearIndex + delta));
+  const year = _passportYearOrder[_passportYearIndex];
+  const label = document.getElementById('passport-yir-current-year');
+  const content = document.getElementById('passport-yir-content');
+  if (label) label.textContent = year;
+  if (content) content.innerHTML = buildPassportYearReviewHtml(_passportYearStats[year]);
+  document.querySelectorAll('.pp-yir-arrow').forEach((btn, idx) => {
+    btn.disabled = idx === 0 ? _passportYearIndex >= _passportYearOrder.length - 1 : _passportYearIndex <= 0;
+  });
 }
 
 function buildPizzaChart(styleData, totalPies) {
@@ -2517,7 +2550,7 @@ function buildIFeedPost(v) {
       <img src="${esc(v.photoUrl)}" class="ifeed-photo" loading="lazy" />
       <div class="ifeed-meta">
         <div class="ifeed-top-row">
-          ${v.rating != null ? `<div class="ifeed-rating">${v.rating}</div>` : '<div></div>'}
+          ${v.rating != null ? `<div class="ifeed-rating">${formatRating(v.rating)}</div>` : '<div></div>'}
           ${tags ? `<div class="ifeed-tags">${tags}</div>` : ''}
         </div>
         <div class="ifeed-place">${esc(v.placeName || 'Unknown')}</div>

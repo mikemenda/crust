@@ -2308,3 +2308,128 @@ textarea.form-input {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ============================================================
+   CRUST — Passport V48 Refinement
+   Focus: centered passport streak, clearer taste profile,
+   one-year review carousel, tighter record-book sections.
+   ============================================================ */
+
+#screen-passport .stat-card.streak {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 12px !important;
+  text-align: left !important;
+}
+
+#screen-passport .stat-card.streak .streak-icon {
+  flex: 0 0 42px !important;
+}
+
+#screen-passport .stat-card.streak .streak-num {
+  flex: 0 0 auto !important;
+  font-size: 30px !important;
+}
+
+#screen-passport .stat-card.streak .streak-body {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+}
+
+#screen-passport .pp-insight-grid {
+  gap: 8px !important;
+}
+
+#screen-passport .pp-insight-card {
+  min-height: 84px !important;
+  padding: 12px 13px !important;
+}
+
+#screen-passport .pp-insight-sub {
+  font-size: 10.8px !important;
+  letter-spacing: .02px;
+  color: rgba(240,234,214,.46) !important;
+}
+
+#screen-passport .pp-style-card {
+  padding-top: 12px !important;
+}
+
+#screen-passport .pp-style-breakdown {
+  gap: 10px !important;
+}
+
+#screen-passport .pp-style-donut-wrap {
+  padding-top: 0 !important;
+}
+
+#screen-passport .pp-style-donut {
+  width: 174px !important;
+}
+
+#screen-passport .pp-style-row {
+  min-height: 28px !important;
+  padding: 5px 8px !important;
+}
+
+#screen-passport .pp-yir-shell {
+  padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 18px);
+}
+
+#screen-passport .pp-yir-switcher {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#screen-passport .pp-yir-current-year {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgba(240,234,214,.035);
+  border: 1px solid rgba(200,169,126,.14);
+  color: var(--cream);
+  font-size: 20px;
+  font-weight: 300;
+  letter-spacing: .2px;
+}
+
+#screen-passport .pp-yir-arrow {
+  height: 42px;
+  border: 1px solid rgba(200,169,126,.14);
+  border-radius: 16px;
+  background: rgba(240,234,214,.035);
+  color: var(--amber);
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 300;
+}
+
+#screen-passport .pp-yir-arrow:disabled {
+  opacity: .28;
+  color: rgba(240,234,214,.28);
+}
+
+#screen-passport .pp-yir-grid--new {
+  padding: 0 !important;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-card {
+  min-height: 86px !important;
+}
+
+#screen-passport .pp-yir-snapshot .pp-yir-value {
+  font-size: 22px !important;
+}
+
+#screen-passport .pp-rank-list--compact .pp-rank-row:nth-child(n+6) {
+  display: none !important;
+}
