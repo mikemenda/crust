@@ -2293,9 +2293,9 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     <div class="pp-section-label" style="margin-top:4px;">Year in Review</div>
     <div class="pp-yir-shell" id="passport-yir-shell">
       <div class="pp-yir-switcher">
-        <button class="pp-yir-arrow" onclick="passportChangeYear(1)" aria-label="Previous year">‹</button>
+        <button class="pp-yir-arrow" onclick="passportChangeYear(1)" aria-label="Previous year">${chevronSvg('left')}</button>
         <div class="pp-yir-current-year" id="passport-yir-current-year">${_passportYearOrder[_passportYearIndex] || currentYear}</div>
-        <button class="pp-yir-arrow" onclick="passportChangeYear(-1)" aria-label="Next year">›</button>
+        <button class="pp-yir-arrow" onclick="passportChangeYear(-1)" aria-label="Next year">${chevronSvg('right')}</button>
       </div>
       <div class="pp-yir-grid pp-yir-grid--new" id="passport-yir-content">
         ${buildPassportYearReviewHtml(_passportYearStats[_passportYearOrder[_passportYearIndex]], scoreLabel, plural)}
@@ -2307,6 +2307,13 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
   initPassportYearReviewGestures();
 }
 
+
+function chevronSvg(direction = 'right') {
+  const pts = direction === 'left' ? '15 18 9 12 15 6' : '9 18 15 12 9 6';
+  return `<svg class="pp-yir-arrow-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"></polyline>
+  </svg>`;
+}
 
 function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (n, word) => `${n} ${word}${Number(n) === 1 ? '' : 's'}`) {
   if (!data) return '';
@@ -2351,28 +2358,72 @@ function updatePassportYearControls() {
 
 function initPassportYearReviewGestures() {
   const shell = document.getElementById('passport-yir-shell');
-  if (!shell || shell.dataset.swipeReady === '1') return;
-  shell.dataset.swipeReady = '1';
+  if (!shell) return;
+
+  // Rebind cleanly every render/load so the carousel never gets stuck with stale handlers.
+  if (shell._yirCleanup) shell._yirCleanup();
 
   let startX = 0;
   let startY = 0;
   let tracking = false;
 
-  shell.addEventListener('touchstart', (e) => {
-    if (!e.touches || e.touches.length !== 1) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
+  const begin = (x, y) => {
+    startX = x;
+    startY = y;
     tracking = true;
-  }, { passive: true });
+  };
 
-  shell.addEventListener('touchend', (e) => {
-    if (!tracking || !e.changedTouches || !e.changedTouches.length) return;
+  const finish = (x, y) => {
+    if (!tracking) return;
     tracking = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+
+    const dx = x - startX;
+    const dy = y - startY;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+
+    // Horizontal intent only: small threshold, but ignore normal vertical scrolls.
+    if (adx < 34 || adx < ady * 1.15) return;
+
+    // Swipe left = older year. Swipe right = newer year.
     passportChangeYear(dx < 0 ? 1 : -1);
-  }, { passive: true });
+  };
+
+  const onTouchStart = (e) => {
+    if (!e.touches || e.touches.length !== 1) return;
+    begin(e.touches[0].clientX, e.touches[0].clientY);
+  };
+  const onTouchEnd = (e) => {
+    if (!e.changedTouches || !e.changedTouches.length) return;
+    finish(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+  };
+  const onTouchCancel = () => { tracking = false; };
+
+  const onPointerDown = (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    begin(e.clientX, e.clientY);
+  };
+  const onPointerUp = (e) => finish(e.clientX, e.clientY);
+  const onPointerCancel = () => { tracking = false; };
+
+  shell.addEventListener('touchstart', onTouchStart, { passive: true });
+  shell.addEventListener('touchend', onTouchEnd, { passive: true });
+  shell.addEventListener('touchcancel', onTouchCancel, { passive: true });
+  shell.addEventListener('pointerdown', onPointerDown);
+  shell.addEventListener('pointerup', onPointerUp);
+  shell.addEventListener('pointercancel', onPointerCancel);
+  shell.addEventListener('lostpointercapture', onPointerCancel);
+
+  shell._yirCleanup = () => {
+    shell.removeEventListener('touchstart', onTouchStart);
+    shell.removeEventListener('touchend', onTouchEnd);
+    shell.removeEventListener('touchcancel', onTouchCancel);
+    shell.removeEventListener('pointerdown', onPointerDown);
+    shell.removeEventListener('pointerup', onPointerUp);
+    shell.removeEventListener('pointercancel', onPointerCancel);
+    shell.removeEventListener('lostpointercapture', onPointerCancel);
+    shell._yirCleanup = null;
+  };
 }
 
 function passportChangeYear(delta) {

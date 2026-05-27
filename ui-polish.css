@@ -2613,3 +2613,101 @@ textarea.form-input {
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }
+
+
+/* ============================================================
+   CRUST — Passport V51 Year in Review Final Tuning
+   Focus: tighter yearly recap cards, centered SVG arrows,
+   more reliable swipe gestures across the whole section.
+   ============================================================ */
+
+#screen-passport .pp-yir-shell {
+  padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 16px) !important;
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#screen-passport .pp-yir-switcher {
+  grid-template-columns: 34px 1fr 34px !important;
+  gap: 7px !important;
+  margin-bottom: 7px !important;
+}
+
+#screen-passport .pp-yir-current-year {
+  min-height: 35px !important;
+  border-radius: 14px !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#screen-passport .pp-yir-arrow {
+  width: 34px !important;
+  height: 35px !important;
+  min-height: 35px !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+#screen-passport .pp-yir-arrow-svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+  transform: translateY(.25px);
+}
+
+#screen-passport .pp-yir-arrow:disabled {
+  opacity: .18 !important;
+}
+
+#screen-passport .pp-yir-grid--new {
+  gap: 7px !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-card {
+  min-height: 88px !important;
+  padding: 11px 11px 10px !important;
+  border-radius: 19px !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-value,
+#screen-passport .pp-yir-grid--new .pp-yir-snapshot .pp-yir-value {
+  font-size: clamp(14.2px, 3.75vw, 16px) !important;
+  line-height: 1.12 !important;
+  letter-spacing: -.22px !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-label {
+  margin-top: 7px !important;
+  font-size: 8.4px !important;
+  line-height: 1.05 !important;
+  letter-spacing: .86px !important;
+}
+
+#screen-passport .pp-yir-grid--new .pp-yir-sub {
+  margin-top: 4px !important;
+  font-size: clamp(9.2px, 2.55vw, 10.1px) !important;
+  line-height: 1.12 !important;
+}
+
+@media (max-width: 380px) {
+  #screen-passport .pp-yir-grid--new .pp-yir-card {
+    min-height: 84px !important;
+    padding: 10px 10px 9px !important;
+  }
+
+  #screen-passport .pp-yir-grid--new .pp-yir-value,
+  #screen-passport .pp-yir-grid--new .pp-yir-snapshot .pp-yir-value {
+    font-size: 13.7px !important;
+  }
+}
