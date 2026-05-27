@@ -36,9 +36,28 @@ function toast(msg, type = '') {
 
 // ── Router ───────────────────────────────────────────────────
 function navigate(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const prev = document.querySelector('.screen.active');
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('active', 'screen-enter', 'screen-enter-active');
+  });
+
   const s = document.getElementById(`screen-${id}`);
-  if (s) { s.classList.add('active'); currentScreen = id; }
+  if (s) {
+    s.classList.add('active');
+    currentScreen = id;
+
+    // Tiny final-motion pass: gives bottom-nav screen changes a subtle
+    // native-feeling fade/slide without changing layout or data logic.
+    if (prev && prev !== s && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      s.classList.add('screen-enter');
+      requestAnimationFrame(() => {
+        s.classList.add('screen-enter-active');
+        window.setTimeout(() => {
+          s.classList.remove('screen-enter', 'screen-enter-active');
+        }, 220);
+      });
+    }
+  }
 
   document.querySelectorAll('.nav-btn[data-screen], .nav-fab[data-screen]').forEach(b => {
     b.classList.toggle('active', b.dataset.screen === id);

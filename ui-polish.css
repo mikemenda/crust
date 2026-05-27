@@ -3304,3 +3304,176 @@ textarea.form-input {
     padding: 15px 16px 26px;
   }
 }
+
+
+/* ============================================================
+   CRUST — Final Motion Polish Pass (V56)
+   Subtle only: screen transitions, sheet entry, press feedback,
+   Passport chart/bar entrance, and reduced-motion support.
+   ============================================================ */
+
+/* ── Screen transitions: bottom-nav changes only ───────────── */
+.screen.screen-enter {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.screen.screen-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms ease, transform 180ms var(--ease);
+}
+
+/* ── Micro press feedback: tactile, not bouncy ─────────────── */
+.entry-card,
+.stat-card,
+.globe-teaser,
+.home-photo-cell,
+.feed-gallery-tile,
+.place-card,
+.dest-card,
+.bucket-card,
+.pp-insight-card,
+.pp-rank-row,
+.pp-yir-card,
+.filter-pill,
+.style-chip,
+.style-sheet-chip,
+.btn-icon,
+.btn-see-all,
+.btn-save,
+.nav-btn,
+.nav-fab {
+  transition:
+    transform 120ms ease,
+    opacity 120ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.entry-card:active,
+.stat-card:active,
+.globe-teaser:active,
+.home-photo-cell:active,
+.feed-gallery-tile:active,
+.place-card:active,
+.dest-card:active,
+.bucket-card:active,
+.pp-insight-card:active,
+.pp-rank-row:active,
+.pp-yir-card:active,
+.filter-pill:active,
+.style-chip:active,
+.style-sheet-chip:active,
+.btn-icon:active,
+.btn-see-all:active,
+.btn-save:active,
+.nav-btn:active,
+.nav-fab:active {
+  transform: scale(.985);
+}
+
+.nav-fab:active,
+.btn-save:active {
+  transform: scale(.97);
+}
+
+/* ── Bottom sheets / overlays: smoother open feel ──────────── */
+.detail-overlay:not(.hidden),
+.place-detail-overlay:not(.hidden),
+.filter-sheet-overlay:not(.hidden),
+#style-sheet-overlay:not(.hidden),
+#feed-filter-sheet-overlay:not(.hidden),
+#feed-photo-overlay:not(.hidden),
+#wishlist-add-overlay:not(.hidden) {
+  animation: crustFadeIn 160ms ease both;
+}
+
+.detail-overlay:not(.hidden) .detail-sheet,
+.place-detail-overlay:not(.hidden) .place-detail-sheet,
+.filter-sheet-overlay:not(.hidden) .filter-sheet,
+#style-sheet-overlay:not(.hidden) .style-sheet,
+#feed-filter-sheet-overlay:not(.hidden) .filter-sheet,
+#wishlist-add-overlay:not(.hidden) .wishlist-add-sheet {
+  animation: crustSheetUp 220ms var(--ease) both;
+  will-change: transform, opacity;
+}
+
+@keyframes crustFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes crustSheetUp {
+  from { opacity: .92; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Passport: subtle one-time chart/stat entrance ─────────── */
+#screen-passport.active .pp-card,
+#screen-passport.active .pp-insight-card,
+#screen-passport.active .pp-rank-row,
+#screen-passport.active .pp-yir-card {
+  animation: crustSoftRise 240ms ease both;
+}
+
+#screen-passport.active .pp-insight-card:nth-child(2),
+#screen-passport.active .pp-rank-row:nth-child(2),
+#screen-passport.active .pp-yir-card:nth-child(2) { animation-delay: 25ms; }
+#screen-passport.active .pp-insight-card:nth-child(3),
+#screen-passport.active .pp-rank-row:nth-child(3),
+#screen-passport.active .pp-yir-card:nth-child(3) { animation-delay: 50ms; }
+#screen-passport.active .pp-insight-card:nth-child(4),
+#screen-passport.active .pp-rank-row:nth-child(4),
+#screen-passport.active .pp-yir-card:nth-child(4) { animation-delay: 75ms; }
+#screen-passport.active .pp-insight-card:nth-child(5),
+#screen-passport.active .pp-rank-row:nth-child(5) { animation-delay: 100ms; }
+#screen-passport.active .pp-insight-card:nth-child(6) { animation-delay: 125ms; }
+
+@keyframes crustSoftRise {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+#screen-passport.active .pp-year-fill {
+  transform-origin: left center;
+  animation: crustBarGrow 420ms ease both;
+}
+
+@keyframes crustBarGrow {
+  from { transform: scaleX(.08); opacity: .62; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
+#screen-passport.active .pp-style-segment {
+  animation: crustDonutIn 460ms ease both;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes crustDonutIn {
+  from { opacity: .25; stroke-width: 13; }
+  to   { opacity: 1; stroke-width: 16; }
+}
+
+/* ── Globe/map fade tuning: keep current logic, soften visual handoff ─ */
+.world-view-fade-in,
+.world-view-fade-out {
+  will-change: opacity, transform;
+}
+
+/* ── Accessibility: disable motion for users who request it ─ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .001ms !important;
+  }
+
+  .screen.screen-enter,
+  .screen.screen-enter-active {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
