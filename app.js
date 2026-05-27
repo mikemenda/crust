@@ -308,7 +308,7 @@ function entryCard(id, v, context = 'open-entry') {
           <div class="entry-tags">${tags}</div>
         </div>
         <div class="entry-right">
-          <div class="entry-rating-num">${v.rating ?? '—'}</div>
+          <div class="entry-rating-num">${formatRating(v.rating)}</div>
         </div>
       </div>
     </div>`;
@@ -349,7 +349,7 @@ async function openEntry(id) {
       <div class="detail-meta-row detail-meta-grid">
         <div class="detail-meta-item">
           <div class="detail-meta-label">Rating</div>
-          <div class="detail-rating-big">${(v.rating ?? '—')}</div>
+          <div class="detail-rating-big">${formatRating(v.rating)}</div>
         </div>
         <div class="detail-meta-item">
           <div class="detail-meta-label">Date</div>
@@ -567,6 +567,8 @@ function openJourneyFilter(key) {
 
   const current = _journeyFilters[key];
   document.getElementById('filter-sheet-title').textContent = titles[key] || key;
+  const clearBtn = document.querySelector('#filter-sheet-overlay .filter-sheet-clear');
+  if (clearBtn) clearBtn.setAttribute('onclick', 'clearJourneyFilter()');
 
   document.getElementById('filter-options-list').innerHTML = _filterOptionsList.map((o, i) => `
     <div class="filter-option ${o === current ? 'selected' : ''}" onclick="selectJourneyFilter(${i})">
@@ -663,35 +665,38 @@ function pizzaPlaceholderSvg(size = 30) {
   </svg>`;
 }
 
-function formatRating(val) {
-  if (val === null || val === undefined || val === '' || isNaN(Number(val))) return '—';
-  const n = Number(val);
-  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, '');
-}
 
-function humanDate(value) {
-  if (!value) return '';
-  const d = value?.toDate ? value.toDate() : new Date(value);
-  if (isNaN(d)) return String(value);
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-}
-
-function placePlaceholderSvg(size = 22) {
+// App-native placeholder for restaurants/places without an uploaded logo.
+function placePlaceholderSvg(size = 24) {
   return `<svg class="place-placeholder-svg" viewBox="0 0 64 64" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M18 29.5h28v21H18z" fill="none" stroke="#C8A97E" stroke-width="3" stroke-linejoin="round"/>
-    <path d="M14 29.5h36l-5.2-11.8H19.2L14 29.5Z" fill="none" stroke="#E7D3AA" stroke-width="3" stroke-linejoin="round"/>
-    <path d="M23 50.5V38h9v12.5" fill="none" stroke="#8E7A61" stroke-width="2.4" stroke-linejoin="round" opacity=".9"/>
-    <path d="M37 38h5.5v5.5H37z" fill="none" stroke="#8E7A61" stroke-width="2.2" opacity=".9"/>
-    <circle cx="47" cy="18" r="2.2" fill="#D85A30" opacity=".9"/>
+    <path d="M19 30.5V52h26V30.5" fill="none" stroke="#B99A72" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M16 30.5h32l-4.8-12.5H20.8L16 30.5Z" fill="none" stroke="#E7D3AA" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M22 30.5c0 3.1 2.5 5.6 5.6 5.6s5.6-2.5 5.6-5.6" fill="none" stroke="#8E7A61" stroke-width="2.2" stroke-linecap="round" opacity=".75"/>
+    <path d="M33.2 30.5c0 3.1 2.5 5.6 5.6 5.6s5.6-2.5 5.6-5.6" fill="none" stroke="#8E7A61" stroke-width="2.2" stroke-linecap="round" opacity=".75"/>
+    <path d="M29 52V41h6v11" fill="none" stroke="#B99A72" stroke-width="2.4" stroke-linejoin="round"/>
+    <circle cx="42.5" cy="22.5" r="2.3" fill="#D85A30" opacity=".84"/>
   </svg>`;
 }
 
-function destinationPlaceholderSvg(size = 28) {
+// App-native placeholder for city/country destinations without a cover image.
+function destinationPlaceholderSvg(size = 30) {
   return `<svg class="destination-placeholder-svg" viewBox="0 0 64 64" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M32 56s17-15.2 17-31a17 17 0 0 0-34 0c0 15.8 17 31 17 31Z" fill="none" stroke="#C8A97E" stroke-width="3" stroke-linejoin="round"/>
-    <circle cx="32" cy="25" r="6.5" fill="none" stroke="#E7D3AA" stroke-width="3"/>
-    <path d="M20 52c3.8 2.8 20.2 2.8 24 0" fill="none" stroke="#8E7A61" stroke-width="2.4" stroke-linecap="round" opacity=".8"/>
+    <path d="M32 55s16-13.3 16-29a16 16 0 1 0-32 0c0 15.7 16 29 16 29Z" fill="none" stroke="#E7D3AA" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="32" cy="26" r="6.2" fill="none" stroke="#B99A72" stroke-width="2.8"/>
+    <path d="M20 54h24" stroke="#8E7A61" stroke-width="2.4" stroke-linecap="round" opacity=".65"/>
+    <circle cx="42.5" cy="18.5" r="2.2" fill="#D85A30" opacity=".82"/>
   </svg>`;
+}
+
+function formatDisplayDate(value, opts = { month: 'short', day: 'numeric', year: 'numeric' }) {
+  const d = value?.toDate ? value.toDate() : (value ? new Date(value) : null);
+  return d && !isNaN(d) ? d.toLocaleDateString('en-US', opts) : '';
+}
+
+function formatRating(value) {
+  if (value == null || value === '' || isNaN(Number(value))) return '—';
+  const n = Number(value);
+  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, '');
 }
 
 function avgRating(ratingHistory) {
@@ -755,17 +760,20 @@ function renderPlaces() {
 
   html += places.map(p => placeCard(p)).join('');
   feed.innerHTML = html;
-  initSwipeCards();
+  initWishlistSwipeCards();
 }
 
 function wishlistAddBtn() {
   return `<button class="btn-add-wishlist" onclick="openWishlistAdd()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-    Add a place
+    <span class="btn-add-wishlist-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </span>
+    <span>Add a place</span>
   </button>`;
 }
+
 
 function renderWishlistFilterPills() {
   const pills = [];
@@ -830,49 +838,54 @@ function placeCard(p) {
 
   const logoHtml = p.logoUrl
     ? `<span class="place-card-logo"><img src="${esc(p.logoUrl)}" loading="lazy" /></span>`
-    : `<span class="place-card-logo place-card-logo--default">${placePlaceholderSvg(22)}</span>`;
+    : `<span class="place-card-logo place-card-logo--default">${placePlaceholderSvg(23)}</span>`;
 
   if (p.isWishlist) {
     return `
-      <div class="swipe-wrapper swipe-wrapper-wishlist" data-wishlist-id="${pid}">
-        <div class="swipe-reveal swipe-reveal-delete">
+      <div class="bucket-swipe-wrapper" data-place-id="${esc(pid)}">
+        <div class="swipe-reveal swipe-reveal-delete bucket-delete-reveal">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
           Delete
         </div>
-        <div class="place-card wishlist" onclick="openPlace('${pid}')">
+        <div class="place-card wishlist" onclick="openPlace('${esc(pid)}')">
           <div class="place-card-top">
             <div class="place-card-name-row">
               ${logoHtml}
-              <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+              <div class="place-card-text">
+                <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+                ${loc ? `<div class="place-card-sub">${esc(loc)}</div>` : ''}
+              </div>
             </div>
             <span class="wishlist-badge">Want</span>
           </div>
-          ${loc ? `<div class="place-card-sub">${esc(loc)}</div>` : ''}
         </div>
       </div>`;
   }
 
   return `
-    <div class="place-card" onclick="openPlace('${pid}')">
+    <div class="place-card" onclick="openPlace('${esc(pid)}')">
       <div class="place-card-top">
         <div class="place-card-name-row">
           ${logoHtml}
-          <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+          <div class="place-card-text">
+            <div class="place-card-name">${esc(p.name || 'Unknown')}</div>
+            ${loc ? `<div class="place-card-sub">${esc(loc)}</div>` : ''}
+            <div class="place-card-meta">
+              <span class="place-visit-badge">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                ${p.visitCount || 1} ${(p.visitCount || 1) === 1 ? 'visit' : 'visits'}
+              </span>
+              ${lastStr ? `<span class="place-last-visit">Last: ${lastStr}</span>` : ''}
+            </div>
+          </div>
         </div>
         ${avg ? `<div class="place-card-rating">${formatRating(avg)}</div>` : ''}
       </div>
-      ${loc ? `<div class="place-card-sub">${esc(loc)}</div>` : ''}
-      <div class="place-card-meta">
-        <span class="place-visit-badge">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-          </svg>
-          ${p.visitCount || 1} ${(p.visitCount || 1) === 1 ? 'visit' : 'visits'}
-        </span>
-        ${lastStr ? `<span class="place-last-visit">Last: ${lastStr}</span>` : ''}
-      </div>
     </div>`;
 }
+
 
 function switchPlacesTab(tab) {
   _placesTab = tab;
@@ -933,19 +946,21 @@ async function openPlace(placeId) {
         <div class="rating-drift">
           ${sorted.map(r => `
             <div class="rating-drift-item">
-              <span class="rating-drift-date">${esc(humanDate(r.date))}</span>
+              <span class="rating-drift-date">${esc(formatDisplayDate(r.date, { month: 'long', day: 'numeric', year: 'numeric' }) || r.date || '')}</span>
               <span class="rating-drift-val">${formatRating(r.rating)}</span>
             </div>`).join('')}
         </div>`;
     }
 
+    const logoMarkup = place.logoUrl
+      ? `<img src="${esc(place.logoUrl)}" class="place-logo-img" />`
+      : `<div class="place-logo-default">${placePlaceholderSvg(38)}</div>`;
+
     body.innerHTML = `
-      <div class="place-detail-header">
+      <div class="place-detail-header ${place.isWishlist ? 'place-detail-header--wishlist' : ''}">
         <div class="place-logo-outer" onclick="changePlaceLogo('${esc(placeId)}')">
           <div class="place-logo-inner">
-            ${place.logoUrl
-              ? `<img src="${esc(place.logoUrl)}" class="place-logo-img" />`
-              : `<div class="place-logo-default">${placePlaceholderSvg(34)}</div>`}
+            ${logoMarkup}
           </div>
           <div class="place-logo-edit-hint">
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -957,20 +972,20 @@ async function openPlace(placeId) {
         </div>
       </div>
       ${place.isWishlist ? `
-      <div style="padding: 0 0 20px;">
-        <button class="btn-save" onclick="logFromWishlist('${esc(placeId)}')">
+      <div class="wishlist-cta-block">
+        <button class="btn-save btn-log-here" onclick="logFromWishlist('${esc(placeId)}')">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" style="vertical-align:middle;margin-right:6px;">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Log a Pizza Here
         </button>
       </div>` : ''}
-      <div class="place-stats-row">
+      <div class="place-stats-row ${place.isWishlist ? 'place-stats-row--single' : ''}">
         <div class="place-stat-chip">
           <div class="place-stat-chip-num">${vc}</div>
           <div class="place-stat-chip-label">${vc === 1 ? 'Visit' : 'Visits'}</div>
         </div>
-        ${avg ? `<div class="place-stat-chip">
+        ${(!place.isWishlist && avg) ? `<div class="place-stat-chip">
           <div class="place-stat-chip-num">${formatRating(avg)}</div>
           <div class="place-stat-chip-label">Avg Rating</div>
         </div>` : ''}
@@ -980,7 +995,7 @@ async function openPlace(placeId) {
           <div class="wishlist-empty-title">No pizzas logged here yet.</div>
           <div class="wishlist-empty-body">Log your first visit to move this spot into Visited.</div>
         </div>
-        <button class="btn-remove-wishlist" onclick="removeWishlistPlace('${esc(placeId)}')">Remove from Bucket List</button>
+        <button class="btn-remove-wishlist" onclick="deleteWishlistPlace('${esc(placeId)}', true)">Remove from Bucket List</button>
       ` : ''}
       ${driftHtml}
       ${visits.length ? `
@@ -995,6 +1010,7 @@ async function openPlace(placeId) {
     body.innerHTML = '<div style="text-align:center;padding:48px;opacity:.35;font-size:14px;">Couldn\'t load place.</div>';
   }
 }
+
 
 function closePlaceDetail() {
   const overlay = document.getElementById('place-detail-overlay');
@@ -1185,17 +1201,68 @@ async function saveWishlistPlace() {
   }
 }
 
-async function removeWishlistPlace(placeId) {
+
+// ── Bucket List delete handling ──────────────────────────────
+function initWishlistSwipeCards() {
+  document.querySelectorAll('.bucket-swipe-wrapper:not([data-swipe-init])').forEach(wrapper => {
+    wrapper.setAttribute('data-swipe-init', '1');
+    const card = wrapper.querySelector('.place-card');
+    if (!card) return;
+
+    let startX = 0, startY = 0, dx = 0;
+    let dragging = false, isScrolling = false;
+    const TRIGGER = 38;
+
+    wrapper.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dx = 0; dragging = true; isScrolling = false;
+      card.style.transition = 'none';
+    }, { passive: true });
+
+    wrapper.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const moveX = e.touches[0].clientX - startX;
+      const moveY = e.touches[0].clientY - startY;
+      if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 6) {
+        isScrolling = true;
+        card.style.transition = 'transform 0.22s ease';
+        card.style.transform = '';
+        return;
+      }
+      if (isScrolling) return;
+      e.preventDefault();
+      dx = moveX;
+      const clamped = Math.max(-56, Math.min(0, dx));
+      card.style.transform = `translateX(${clamped}px)`;
+    }, { passive: false });
+
+    wrapper.addEventListener('touchend', () => {
+      if (!dragging || isScrolling) { dragging = false; return; }
+      dragging = false;
+      card.style.transition = 'transform 0.22s ease';
+      const placeId = wrapper.dataset.placeId;
+      if (dx < -TRIGGER) {
+        card.style.transform = '';
+        deleteWishlistPlace(placeId);
+      } else {
+        card.style.transform = '';
+      }
+    });
+  });
+}
+
+async function deleteWishlistPlace(placeId, fromDetail = false) {
   if (!currentUser || !placeId) return;
   if (!confirm('Remove this place from your bucket list?')) return;
   try {
     await db.collection(`users/${currentUser.uid}/places`).doc(placeId).delete();
     _placesAll = _placesAll.filter(p => (p.placeId || p.id) !== placeId);
-    closePlaceDetail();
+    if (fromDetail) closePlaceDetail();
     toast('Removed from bucket list.', 'success');
     if (currentScreen === 'places') renderPlaces();
   } catch (e) {
-    console.error('removeWishlistPlace:', e);
+    console.error('deleteWishlistPlace:', e);
     toast('Remove failed — try again.', 'error');
   }
 }
@@ -1663,7 +1730,7 @@ function resetAllSwipes() {
 function initSwipeCards() {
   document.querySelectorAll('.swipe-wrapper:not([data-swipe-init])').forEach(wrapper => {
     wrapper.setAttribute('data-swipe-init', '1');
-    const card = wrapper.querySelector('.entry-card, .place-card');
+    const card = wrapper.querySelector('.entry-card');
     if (!card) return;
 
     let startX = 0, startY = 0, dx = 0;
@@ -1701,16 +1768,14 @@ function initSwipeCards() {
       dragging = false;
       card.style.transition = 'transform 0.22s ease';
       const entryId = wrapper.dataset.entryId;
-      const wishlistId = wrapper.dataset.wishlistId;
 
       if (dx < -TRIGGER) {
         // Left swipe → delete
         card.style.transform = '';
         _openSwipeWrapper = null;
-        if (wishlistId) removeWishlistPlace(wishlistId);
-        else deleteEntryById(entryId);
-      } else if (dx > TRIGGER && entryId) {
-        // Right swipe → edit visit entries only
+        deleteEntryById(entryId);
+      } else if (dx > TRIGGER) {
+        // Right swipe → edit
         card.style.transform = '';
         _openSwipeWrapper = null;
         loadAndEditEntry(entryId);
@@ -2526,6 +2591,7 @@ function destCard(g, i) {
     </div>`;
 }
 
+
 async function openDestination(idx) {
   const g = _destGroups[idx];
   if (!g) return;
@@ -2565,7 +2631,7 @@ async function openDestination(idx) {
     <div class="dest-cover-wrap">
       ${coverPhoto
         ? `<img src="${esc(coverPhoto)}" class="dest-cover-img" />`
-        : `<div class="dest-cover-placeholder">${destinationPlaceholderSvg(38)}</div>`}
+        : `<div class="dest-cover-placeholder">${destinationPlaceholderSvg(42)}</div>`}
       <button class="dest-cover-change-btn" onclick="changeDestCover('${esc(coverKey)}')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         Change photo
@@ -2585,8 +2651,11 @@ async function openDestination(idx) {
     ${bestRated ? `
     <div class="place-section-label">Best Spot</div>
     <div class="dest-best-spot">
-      <div class="dest-best-name">${esc(bestRated.name || 'Unknown')}</div>
-      <div class="dest-best-meta">${bestRated.visits.length} ${bestRated.visits.length === 1 ? 'visit' : 'visits'} · Avg ${formatRating(bestRated.ratings.reduce((s, r) => s + r, 0) / bestRated.ratings.length)}</div>
+      <div class="dest-best-body">
+        <div class="dest-best-name">${esc(bestRated.name || 'Unknown')}</div>
+        <div class="dest-best-meta">${bestRated.visits.length} ${bestRated.visits.length === 1 ? 'visit' : 'visits'}</div>
+      </div>
+      <div class="dest-best-rating">${formatRating(bestRated.ratings.reduce((s, r) => s + r, 0) / bestRated.ratings.length)}</div>
     </div>` : ''}
 
     <div class="place-section-label" style="margin-top:${bestRated ? '20px' : '0'};">All Spots</div>
