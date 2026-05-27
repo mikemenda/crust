@@ -2029,14 +2029,14 @@ async function loadPassport() {
     const passportStreakStart = (settingsSnap && settingsSnap.exists)
       ? (settingsSnap.data().startDate || null) : null;
     const passportStreak = calcSundayStreak(visits, passportStreakStart);
-    renderPassportContent(visits, places, body, passportStreak);
+    renderPassportContent(visits, places, body, passportStreak, passportStreakStart);
   } catch (e) {
     console.error('loadPassport:', e);
     if (body) body.innerHTML = '<div class="empty-state"><div class="empty-body">Couldn\'t load stats.</div></div>';
   }
 }
 
-function renderPassportContent(visits, places, body, streak = 0) {
+function renderPassportContent(visits, places, body, streak = 0, streakStartDate = null) {
   if (!visits.length) {
     body.innerHTML = `<div class="empty-state">
       <div class="empty-icon">🛂</div>
@@ -2046,33 +2046,66 @@ function renderPassportContent(visits, places, body, streak = 0) {
     return;
   }
 
-  // Lifetime stats
+  const ratedVisits = visits.filter(v => v.rating != null && !isNaN(Number(v.rating)));
   const pies      = visits.length;
   const spots     = new Set(visits.map(v => v.placeId).filter(Boolean)).size;
   const cities    = new Set(visits.map(v => v.city).filter(Boolean)).size;
   const countries = new Set(visits.map(v => v.country).filter(Boolean)).size;
+  const avgLife   = ratedVisits.length ? ratedVisits.reduce((s, v) => s + Number(v.rating), 0) / ratedVisits.length : 0;
 
-  // Style breakdown
+  const plural = (n, word) => `${n} ${word}${Number(n) === 1 ? '' : 's'}`;
+  const cleanMeta = (...parts) => parts.filter(Boolean).join(' · ');
+  const scoreLabel = (n) => formatRating(n);
+
+  const bestByAverage = (items, minCount = 1) => Object.values(items)
+    .filter(x => x.count >= minCount)
+    .map(x => ({ ...x, avg: x.total / x.count }))
+    .sort((a, b) => (b.avg - a.avg) || (b.count - a.count) || String(a.label).localeCompare(String(b.label)))[0] || null;
+
+  // Style breakdown by total logged styles
   const styleCounts = {};
   visits.forEach(v => (v.styles || []).forEach(s => {
     styleCounts[s] = (styleCounts[s] || 0) + 1;
   }));
   const styleData = Object.entries(styleCounts)
     .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
-  // Top 10 rated
+  // Top rated style/city based on ratings, not total count
+  const styleRatings = {};
+  ratedVisits.forEach(v => (v.styles || []).forEach(style => {
+    if (!styleRatings[style]) styleRatings[style] = { label: style, count: 0, total: 0 };
+    styleRatings[style].count++;
+    styleRatings[style].total += Number(v.rating);
+  }));
+  const topRatedStyle = bestByAverage(styleRatings);
+
+  const cityRatings = {};
+  ratedVisits.forEach(v => {
+    const city = (v.city || '').trim();
+    if (!city) return;
+    if (!cityRatings[city]) cityRatings[city] = { label: city, count: 0, total: 0 };
+    cityRatings[city].count++;
+    cityRatings[city].total += Number(v.rating);
+  });
+  const topRatedCity = bestByAverage(cityRatings);
+
+  const explorerPct = pies ? Math.round((spots / pies) * 100) : 0;
+  const perfectCount = ratedVisits.filter(v => Number(v.rating) === 10).length;
+
+  // Top rated places / Hall of Fame
   const ratedPlaces = places
     .filter(p => p.ratingHistory?.length)
     .map(p => ({ ...p, avg: avgRating(p.ratingHistory) }))
-    .sort((a, b) => b.avg - a.avg)
+    .sort((a, b) => b.avg - a.avg || (b.visitCount || 0) - (a.visitCount || 0))
     .slice(0, 10);
 
-  // Hall of Fame
+  // Most visited / Repeat favorite
   const hof = places
     .filter(p => (p.visitCount || 0) > 0)
-    .sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0))
+    .sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0) || (avgRating(b.ratingHistory) - avgRating(a.ratingHistory)))
     .slice(0, 10);
+  const repeatFavorite = hof[0] || null;
 
   // Pies by year
   const byYear = {};
@@ -2082,10 +2115,8 @@ function renderPassportContent(visits, places, body, streak = 0) {
     const yr = String(d.getFullYear());
     byYear[yr] = (byYear[yr] || 0) + 1;
   });
-  const yearKeys = Object.keys(byYear).sort();
+  const yearKeys = Object.keys(byYear).sort((a, b) => Number(b) - Number(a));
   const maxPies  = Math.max(...Object.values(byYear), 1);
-
-  // Year in review
   const bestYear = yearKeys.reduce((best, yr) =>
     byYear[yr] > (byYear[best] || 0) ? yr : best, yearKeys[0]);
 
@@ -2104,83 +2135,144 @@ function renderPassportContent(visits, places, body, streak = 0) {
   const bestMonth = Object.values(monthCounts).sort((a, b) => b.count - a.count)[0];
 
   const currentYear = new Date().getFullYear();
-  const tyPlaceCount = {};
-  visits.forEach(v => {
+  const currentYearVisits = visits.filter(v => {
     const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
-    if (isNaN(d) || d.getFullYear() !== currentYear) return;
+    return !isNaN(d) && d.getFullYear() === currentYear;
+  });
+  const cySpots = new Set(currentYearVisits.map(v => v.placeId).filter(Boolean)).size;
+  const cyCities = new Set(currentYearVisits.map(v => v.city).filter(Boolean)).size;
+  const cyCountries = new Set(currentYearVisits.map(v => v.country).filter(Boolean)).size;
+
+  const tyPlaceCount = {};
+  currentYearVisits.forEach(v => {
     if (!v.placeId) return;
     if (!tyPlaceCount[v.placeId]) tyPlaceCount[v.placeId] = { count: 0, name: v.placeName };
     tyPlaceCount[v.placeId].count++;
   });
-  const topSpot = Object.values(tyPlaceCount).sort((a, b) => b.count - a.count)[0];
+  const topSpot = Object.values(tyPlaceCount).sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name)))[0];
+
+  const tyStyleRatings = {};
+  currentYearVisits.filter(v => v.rating != null && !isNaN(Number(v.rating))).forEach(v => (v.styles || []).forEach(style => {
+    if (!tyStyleRatings[style]) tyStyleRatings[style] = { label: style, count: 0, total: 0 };
+    tyStyleRatings[style].count++;
+    tyStyleRatings[style].total += Number(v.rating);
+  }));
+  const topYearStyle = bestByAverage(tyStyleRatings);
 
   body.innerHTML = `
     <div class="pp-section-label">Lifetime</div>
-    <div class="stats-grid" style="padding:0 16px 16px;">
+    <div class="stats-grid passport-lifetime-grid">
       <div class="stat-card"><div class="stat-label">Pizzas</div><div class="stat-num">${pies}</div></div>
       <div class="stat-card"><div class="stat-label">Spots</div><div class="stat-num">${spots}</div></div>
       <div class="stat-card"><div class="stat-label">Cities</div><div class="stat-num">${cities}</div></div>
       <div class="stat-card"><div class="stat-label">Countries</div><div class="stat-num">${countries}</div></div>
       <div class="stat-card streak" style="grid-column:span 2;cursor:default;">
-        <div class="streak-emoji">🔥</div>
-        <div class="streak-body">
-          <div class="streak-num">${streak}</div>
-          <div class="streak-title">Sunday Streak</div>
+        <div class="streak-emoji streak-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22c3.9 0 7-2.7 7-6.5 0-2.2-1-4.1-2.4-5.6-.7 2.2-2 3.3-3.1 3.8.7-3.6-.7-6.7-4-9.7.2 3.3-1.2 5.1-2.7 6.7C5.6 12 5 13.6 5 15.5 5 19.3 8.1 22 12 22Z"/>
+            <path d="M12 18.8c1.4 0 2.6-1 2.6-2.4 0-.9-.4-1.6-1-2.2-.3.8-.8 1.2-1.3 1.4.2-1.4-.3-2.5-1.5-3.6.1 1.3-.5 2-1.1 2.6-.5.5-.7 1.1-.7 1.8 0 1.4 1.2 2.4 3 2.4Z"/>
+          </svg>
         </div>
+        <div class="streak-num">${streak}</div>
+        <div class="streak-body">
+          <div class="streak-title">Sunday Streak</div>
+          <div class="streak-status">${streakLabel(streak, streakStartDate)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-section-label">Taste Profile</div>
+    <div class="pp-insight-grid">
+      <div class="pp-insight-card">
+        <div class="pp-insight-value">${ratedVisits.length ? scoreLabel(avgLife) : '—'}</div>
+        <div class="pp-insight-label">Avg Rating</div>
+        <div class="pp-insight-sub">${plural(ratedVisits.length, 'rated pie')}</div>
+      </div>
+      <div class="pp-insight-card">
+        <div class="pp-insight-value pp-insight-name">${topRatedStyle ? esc(topRatedStyle.label) : '—'}</div>
+        <div class="pp-insight-label">Top Rated Style</div>
+        <div class="pp-insight-sub">${topRatedStyle ? `Avg ${scoreLabel(topRatedStyle.avg)} · ${plural(topRatedStyle.count, 'pie')}` : 'No style ratings yet'}</div>
+      </div>
+      <div class="pp-insight-card">
+        <div class="pp-insight-value pp-insight-name">${topRatedCity ? esc(topRatedCity.label) : '—'}</div>
+        <div class="pp-insight-label">Top Rated City</div>
+        <div class="pp-insight-sub">${topRatedCity ? `Avg ${scoreLabel(topRatedCity.avg)} · ${plural(topRatedCity.count, 'pie')}` : 'No city ratings yet'}</div>
+      </div>
+      <div class="pp-insight-card">
+        <div class="pp-insight-value">${explorerPct}%</div>
+        <div class="pp-insight-label">Explorer Score</div>
+        <div class="pp-insight-sub">${spots}/${pies} unique spots</div>
+      </div>
+      <div class="pp-insight-card">
+        <div class="pp-insight-value pp-insight-name">${repeatFavorite ? esc(repeatFavorite.name || 'Unknown') : '—'}</div>
+        <div class="pp-insight-label">Repeat Favorite</div>
+        <div class="pp-insight-sub">${repeatFavorite ? plural(repeatFavorite.visitCount || 0, 'visit') : 'No repeats yet'}</div>
+      </div>
+      <div class="pp-insight-card">
+        <div class="pp-insight-value">${perfectCount || '—'}</div>
+        <div class="pp-insight-label">Perfect Scores</div>
+        <div class="pp-insight-sub">${perfectCount ? `${plural(perfectCount, '10/10 pie')}` : 'Still chasing a perfect pie'}</div>
       </div>
     </div>
 
     ${styleData.length ? `
     <div class="pp-section-label">Style Breakdown</div>
-    <div class="pp-card">${buildPizzaChart(styleData, pies)}</div>
+    <div class="pp-card pp-style-card">${buildPizzaChart(styleData, pies)}</div>
     ` : ''}
 
     ${ratedPlaces.length ? `
     <div class="pp-section-label" style="margin-top:4px;">Hall of Fame</div>
     <div class="pp-rank-list">
-      ${ratedPlaces.map((p, i) => `
-        <div class="pp-rank-row" onclick="openPlace('${esc(p.placeId || p.id)}')" style="cursor:pointer;">
+      ${ratedPlaces.map((p, i) => {
+        const loc = [p.city, p.country].filter(Boolean).join(', ');
+        return `<div class="pp-rank-row" onclick="openPlace('${esc(p.placeId || p.id)}')" style="cursor:pointer;">
           <div class="pp-rank-num">${i + 1}</div>
           <div class="pp-rank-body">
             <div class="pp-rank-name">${esc(p.name || 'Unknown')}</div>
-            <div class="pp-rank-sub">${esc([p.city, p.country].filter(Boolean).join(', '))}${p.ratingHistory?.length ? ` · ${p.ratingHistory.length} ${p.ratingHistory.length === 1 ? 'visit' : 'visits'}` : ''}</div>
+            <div class="pp-rank-sub">${esc(cleanMeta(loc, plural(p.ratingHistory?.length || 0, 'visit')))}</div>
           </div>
-          <div class="pp-rank-score">${p.avg.toFixed(1)}</div>
-        </div>`).join('')}
+          <div class="pp-rank-score">${scoreLabel(p.avg)}</div>
+        </div>`;
+      }).join('')}
     </div>
     ` : ''}
 
     ${hof.length ? `
     <div class="pp-section-label" style="margin-top:4px;">Most Visited</div>
-    <div class="pp-rank-list">
+    <div class="pp-rank-list pp-rank-list--compact">
       ${hof.map((p, i) => `
-        <div class="pp-rank-row" onclick="openPlace('${esc(p.placeId || p.id)}')" style="cursor:pointer;">
+        <div class="pp-rank-row pp-rank-row--visits" onclick="openPlace('${esc(p.placeId || p.id)}')" style="cursor:pointer;">
           <div class="pp-rank-num">${i + 1}</div>
           <div class="pp-rank-body">
             <div class="pp-rank-name">${esc(p.name || 'Unknown')}</div>
             <div class="pp-rank-sub">${esc([p.city, p.country].filter(Boolean).join(', '))}</div>
           </div>
-          <div class="pp-rank-score pp-rank-visits">${p.visitCount || 1}<span>×</span></div>
+          <div class="pp-visit-count"><div>${p.visitCount || 1}</div><span>${(p.visitCount || 1) === 1 ? 'visit' : 'visits'}</span></div>
         </div>`).join('')}
     </div>
     ` : ''}
 
     ${yearKeys.length ? `
     <div class="pp-section-label" style="margin-top:4px;">Pies by Year</div>
-    <div class="pp-card">
-      <div class="bar-chart">
+    <div class="pp-card pp-year-card">
+      <div class="pp-year-bars">
         ${yearKeys.map(yr => `
-          <div class="bar-col">
-            <div class="bar-count">${byYear[yr]}</div>
-            <div class="bar-fill" style="height:${Math.max(4, Math.round((byYear[yr] / maxPies) * 80))}px"></div>
-            <div class="bar-label">${yr.slice(2)}</div>
+          <div class="pp-year-row">
+            <div class="pp-year-label">${yr}</div>
+            <div class="pp-year-track"><div class="pp-year-fill" style="width:${Math.max(7, Math.round((byYear[yr] / maxPies) * 100))}%"></div></div>
+            <div class="pp-year-count">${byYear[yr]}</div>
           </div>`).join('')}
       </div>
     </div>
     ` : ''}
 
     <div class="pp-section-label" style="margin-top:4px;">Year in Review</div>
-    <div class="pp-yir-grid">
+    <div class="pp-yir-grid pp-yir-grid--new">
+      <div class="pp-yir-card pp-yir-full pp-yir-snapshot">
+        <div class="pp-yir-value">${currentYear} Snapshot</div>
+        <div class="pp-yir-label">This Year</div>
+        <div class="pp-yir-sub">${currentYearVisits.length} pies · ${cySpots} spots · ${cyCities} cities · ${cyCountries} countries</div>
+      </div>
       <div class="pp-yir-card">
         <div class="pp-yir-value">${bestYear || '—'}</div>
         <div class="pp-yir-label">Best Year</div>
@@ -2192,26 +2284,28 @@ function renderPassportContent(visits, places, body, streak = 0) {
         <div class="pp-yir-sub">${bestMonth ? `${bestMonth.count} pies · ${bestMonth.label}` : ''}</div>
       </div>
       <div class="pp-yir-card pp-yir-full">
-        <div class="pp-yir-value" style="font-size:${topSpot && topSpot.name.length > 18 ? '14px' : '18px'};line-height:1.3;">${topSpot ? esc(topSpot.name) : '—'}</div>
+        <div class="pp-yir-value pp-yir-name">${topSpot ? esc(topSpot.name) : '—'}</div>
         <div class="pp-yir-label">${currentYear} Top Spot</div>
         <div class="pp-yir-sub">${topSpot ? `${topSpot.count} ${topSpot.count === 1 ? 'visit' : 'visits'} this year` : 'No visits logged this year'}</div>
+      </div>
+      <div class="pp-yir-card pp-yir-full">
+        <div class="pp-yir-value pp-yir-name">${topYearStyle ? esc(topYearStyle.label) : '—'}</div>
+        <div class="pp-yir-label">${currentYear} Top Rated Style</div>
+        <div class="pp-yir-sub">${topYearStyle ? `Avg ${scoreLabel(topYearStyle.avg)} · ${plural(topYearStyle.count, 'pie')} this year` : 'No style ratings this year'}</div>
       </div>
     </div>
   `;
 }
 
 function buildPizzaChart(styleData, totalPies) {
-  const total = styleData.reduce((s, d) => s + d.count, 0);
+  const total = styleData.reduce((sum, d) => sum + d.count, 0);
   if (!total) return '';
 
-  const cx = 160;
-  const cy = 150;
-  const radius = 76;
-  const stroke = 22;
-  const labelRadius = 124;
-  const leaderInner = radius + stroke / 2 + 5;
-  const leaderOuter = radius + stroke / 2 + 17;
-  const gapDeg = styleData.length === 1 ? 0 : 1.2;
+  const cx = 86;
+  const cy = 86;
+  const radius = 58;
+  const stroke = 18;
+  const gapDeg = styleData.length === 1 ? 0 : 1.1;
   let angle = -90;
 
   const polar = (r, deg) => {
@@ -2231,84 +2325,40 @@ function buildPizzaChart(styleData, totalPies) {
     const sweep = frac * 360;
     const start = angle + gapDeg / 2;
     const end = angle + sweep - gapDeg / 2;
-    const mid = angle + sweep / 2;
     angle += sweep;
-
-    const anchor = polar(labelRadius, mid);
-    const side = anchor.x >= cx ? 'right' : 'left';
-    const labelX = side === 'right' ? Math.min(306, anchor.x + 8) : Math.max(14, anchor.x - 8);
-    const labelY = Math.max(24, Math.min(282, anchor.y));
-    const p1 = polar(leaderInner, mid);
-    const p2 = polar(leaderOuter, mid);
-    const elbowX = side === 'right' ? labelX - 5 : labelX + 5;
-
     return {
-      label: d.label,
-      count: d.count,
+      ...d,
       pct: Math.round(frac * 100),
       color: STYLE_COLORS[d.label] || '#777',
       start,
       end,
-      mid,
-      side,
-      labelX,
-      labelY,
-      p1,
-      p2,
-      elbowX,
       delay: i * 55,
     };
   });
 
-  const rings = segments.map(s => `
-    <path
-      class="style-ring-segment"
-      d="${arcPath(s.start, s.end)}"
-      fill="none"
-      stroke="${s.color}"
-      stroke-width="${stroke}"
-      style="--delay:${s.delay}ms;"
-    />
-  `).join('');
-
-  const labels = segments.map(s => `
-    <g class="style-ring-callout" style="--delay:${s.delay + 120}ms;">
-      <polyline
-        class="style-ring-leader"
-        points="${s.p1.x.toFixed(1)},${s.p1.y.toFixed(1)} ${s.p2.x.toFixed(1)},${s.p2.y.toFixed(1)} ${s.elbowX.toFixed(1)},${s.labelY.toFixed(1)}"
-      />
-      <text
-        x="${s.labelX.toFixed(1)}"
-        y="${s.labelY.toFixed(1)}"
-        class="style-ring-callout-text"
-        text-anchor="${s.side === 'right' ? 'start' : 'end'}"
-      >${esc(s.label)}, ${s.pct}% (${s.count})</text>
-    </g>
-  `).join('');
-
   return `
-    <div class="style-breakdown-chart style-breakdown-chart--callouts">
-      <div class="style-ring-wrap">
-        <svg viewBox="0 0 320 300" class="style-ring-svg style-ring-svg--callouts" aria-label="Pizza style breakdown chart">
-          <defs>
-            <filter id="styleRingGlow" x="-25%" y="-25%" width="150%" height="150%">
-              <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="rgba(0,0,0,0.28)"/>
-            </filter>
-            <radialGradient id="styleRingCenter" cx="50%" cy="35%" r="70%">
-              <stop offset="0%" stop-color="rgba(255,255,255,0.04)"/>
-              <stop offset="100%" stop-color="rgba(0,0,0,0.12)"/>
-            </radialGradient>
-          </defs>
-          <circle class="style-ring-track" cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke-width="${stroke}" />
-          <g filter="url(#styleRingGlow)">
-            ${rings}
-          </g>
-          <circle class="style-ring-inner" cx="${cx}" cy="${cy}" r="47" />
-          <circle class="style-ring-inner-highlight" cx="${cx}" cy="${cy}" r="40" fill="url(#styleRingCenter)" />
-          <text x="${cx}" y="${cy - 2}" class="style-ring-total" text-anchor="middle">${totalPies}</text>
-          <text x="${cx}" y="${cy + 23}" class="style-ring-label" text-anchor="middle">PIZZAS</text>
-          ${labels}
+    <div class="pp-style-breakdown">
+      <div class="pp-style-donut-wrap">
+        <svg viewBox="0 0 172 172" class="pp-style-donut" aria-label="Pizza style breakdown chart">
+          <circle class="pp-style-track" cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke-width="${stroke}" />
+          ${segments.map(s => `
+            <path class="pp-style-segment" d="${arcPath(s.start, s.end)}" fill="none" stroke="${s.color}" stroke-width="${stroke}" style="--delay:${s.delay}ms;" />
+          `).join('')}
+          <circle class="pp-style-inner" cx="${cx}" cy="${cy}" r="40" />
+          <text x="${cx}" y="${cy - 2}" class="pp-style-total" text-anchor="middle">${totalPies}</text>
+          <text x="${cx}" y="${cy + 20}" class="pp-style-label" text-anchor="middle">PIZZAS</text>
         </svg>
+      </div>
+      <div class="pp-style-list">
+        ${segments.map((s, i) => `
+          <div class="pp-style-row">
+            <div class="pp-style-rank">${i + 1}</div>
+            <div class="pp-style-dot" style="background:${s.color}"></div>
+            <div class="pp-style-name">${esc(s.label)}</div>
+            <div class="pp-style-count">${s.count}</div>
+            <div class="pp-style-pct">${s.pct}%</div>
+          </div>
+        `).join('')}
       </div>
     </div>
   `;
