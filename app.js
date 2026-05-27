@@ -1999,7 +1999,7 @@ function buildPizzaChart(styleData, totalPies) {
         y="${s.labelY.toFixed(1)}"
         class="style-ring-callout-text"
         text-anchor="${s.side === 'right' ? 'start' : 'end'}"
-      >${esc(s.label)}, ${s.pct}%</text>
+      >${esc(s.label)}, ${s.pct}% (${s.count})</text>
     </g>
   `).join('');
 
