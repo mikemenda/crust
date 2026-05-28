@@ -4,22 +4,22 @@
 // Firebase requests always go to network (never cached here).
 //
 // DEPLOY INSTRUCTIONS:
-// Every time you push a new build to Netlify, increment the
+// Every time you push a new build to GitHub, increment the
 // number in APP_VERSION below by 1.
 // That's the only change needed to force all devices to update.
 // ============================================================
 
-const APP_VERSION = 58; // ← bump this number on every deploy
+const APP_VERSION = 59; // ← bump this number on every deploy
 const CACHE = `crust-v${APP_VERSION}`;
 
 const PRECACHE = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/ui-polish.css',
-  '/app.js',
-  '/globe.js',
-  '/manifest.json',
+  '/crust/',
+  '/crust/index.html',
+  '/crust/styles.css',
+  '/crust/ui-polish.css',
+  '/crust/app.js',
+  '/crust/globe.js',
+  '/crust/manifest.json',
 ];
 
 // Install: pre-cache core assets
