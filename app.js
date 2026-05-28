@@ -35,6 +35,8 @@ function toast(msg, type = '') {
 }
 
 // ── Router ───────────────────────────────────────────────────
+const RESTORABLE_SCREENS = new Set(['home', 'journey', 'places', 'passport', 'feed']);
+
 function navigate(id) {
   const prev = document.querySelector('.screen.active');
   document.querySelectorAll('.screen').forEach(s => {
@@ -45,6 +47,9 @@ function navigate(id) {
   if (s) {
     s.classList.add('active');
     currentScreen = id;
+    if (RESTORABLE_SCREENS.has(id)) {
+      try { localStorage.setItem('crust:lastScreen', id); } catch (_) {}
+    }
 
     // Tiny final-motion pass: gives bottom-nav screen changes a subtle
     // native-feeling fade/slide without changing layout or data logic.
@@ -82,7 +87,12 @@ auth.onAuthStateChanged(user => {
     document.getElementById('auth-screen').classList.remove('visible');
     document.getElementById('app').style.display = 'flex';
     renderAvatar(user);
-    navigate('home');
+    let initialScreen = 'home';
+    try {
+      const savedScreen = localStorage.getItem('crust:lastScreen');
+      if (RESTORABLE_SCREENS.has(savedScreen)) initialScreen = savedScreen;
+    } catch (_) {}
+    navigate(initialScreen);
   } else {
     currentUser = null;
     document.getElementById('app').style.display = 'none';
@@ -1038,6 +1048,7 @@ async function openPlace(placeId) {
 
 function closePlaceDetail() {
   const overlay = document.getElementById('place-detail-overlay');
+  if (!overlay) return;
   overlay.classList.add('hidden');
   overlay.style.zIndex = ''; // reset so it doesn't stay elevated
 }
@@ -1891,64 +1902,83 @@ document.getElementById('photo-area').addEventListener('click', () =>
   document.getElementById('photo-input').click()
 );
 
-// ── Swipe-down to close ALL overlays ─────────────────────────
-// Works from anywhere on the sheet. When scroll content is below top, normal
-// scroll happens; swipe-dismiss only fires when sheet is scrolled to the top.
+// ── Swipe-down to close sheets/popups ─────────────────────────
+// Applies only to card/sheet/popup UI. Full-screen pages keep their normal
+// navigation so map/photo gestures do not fight the dismiss gesture.
 (function() {
-  const overlayMap = {
-    'place-detail-overlay':  closePlaceDetail,
-    'dest-detail-overlay':   closeDestination,
-    'entry-detail-overlay':  closeEntryDetail,
-    'wishlist-add-overlay':  closeWishlistAdd,
-    'streak-settings-overlay': closeStreakSettings,
-  };
+  const sheetConfigs = [
+    { id: 'place-detail-overlay',  close: closePlaceDetail,    sheet: '.place-detail-sheet', scroll: '.place-detail-scroll' },
+    { id: 'dest-detail-overlay',   close: closeDestination,    sheet: '.place-detail-sheet', scroll: '.place-detail-scroll' },
+    { id: 'entry-detail-overlay',  close: closeEntryDetail,    sheet: '.detail-sheet',       scroll: '.detail-scroll' },
+    { id: 'wishlist-add-overlay',  close: closeWishlistAdd,    sheet: '.detail-sheet',       scroll: '.detail-scroll' },
+    { id: 'streak-settings-overlay', close: closeStreakSettings, sheet: '.detail-sheet',     scroll: '.detail-scroll' },
+    { id: 'filter-sheet-overlay',  close: closeFilterSheet,    sheet: '.filter-sheet',       scroll: '.filter-options' },
+    { id: 'feed-filter-sheet-overlay', close: closeFeedFilterSheet, sheet: '.filter-sheet',  scroll: '.filter-options' },
+  ];
 
-  Object.entries(overlayMap).forEach(([id, closeFn]) => {
+  sheetConfigs.forEach(({ id, close, sheet: sheetSel, scroll: scrollSel }) => {
     const overlay = document.getElementById(id);
-    if (!overlay) return;
+    if (!overlay || overlay.dataset.dismissInit === '1') return;
+    overlay.dataset.dismissInit = '1';
 
-    // Tap backdrop (dark area outside sheet) → close without disturbing sheet content.
     overlay.addEventListener('click', e => {
-      if (e.target === overlay) closeFn();
+      if (e.target === overlay) close();
     });
 
-    const sheet      = overlay.querySelector('.place-detail-sheet, .detail-sheet');
-    const scrollArea = overlay.querySelector('.place-detail-scroll, .detail-scroll');
+    const sheet = overlay.querySelector(sheetSel);
     if (!sheet) return;
 
-    let startY = 0, tracking = false;
+    sheet.addEventListener('click', e => e.stopPropagation());
+
+    attachSheetDragDismiss(sheet, close, () => {
+      const scrollArea = overlay.querySelector(scrollSel);
+      return scrollArea ? scrollArea.scrollTop : 0;
+    });
+  });
+
+  const globePopup = document.getElementById('globe-pin-popup');
+  if (globePopup && globePopup.dataset.dismissInit !== '1') {
+    globePopup.dataset.dismissInit = '1';
+    attachSheetDragDismiss(globePopup, () => { if (typeof closeGlobePopup === 'function') closeGlobePopup(); }, () => 0);
+  }
+
+  function attachSheetDragDismiss(sheet, closeFn, getScrollTop) {
+    let startY = 0, tracking = false, dragging = false;
 
     sheet.addEventListener('touchstart', e => {
-      startY   = e.touches[0].clientY;
+      if (e.touches.length !== 1) return;
+      startY = e.touches[0].clientY;
       tracking = true;
+      dragging = false;
       sheet.style.transition = 'none';
     }, { passive: true });
 
     sheet.addEventListener('touchmove', e => {
       if (!tracking) return;
-      const scrollTop = scrollArea ? scrollArea.scrollTop : 0;
       const dy = e.touches[0].clientY - startY;
+      const scrollTop = typeof getScrollTop === 'function' ? getScrollTop() : 0;
       if (dy > 0 && scrollTop <= 1) {
-        // Dragging down at top of content — animate dismiss
+        dragging = true;
         e.preventDefault();
         sheet.style.transform = `translateY(${Math.min(dy, 240)}px)`;
-      } else {
-        // Scrolling content — let it scroll normally
+      } else if (dy < -6 || scrollTop > 1) {
         tracking = false;
+        dragging = false;
         sheet.style.transform = '';
       }
     }, { passive: false });
 
     sheet.addEventListener('touchend', e => {
       if (!tracking) return;
-      tracking = false;
       const dy = e.changedTouches[0].clientY - startY;
+      tracking = false;
       sheet.style.transition = 'transform 0.22s ease';
-      sheet.style.transform  = '';
-      if (dy > 80) closeFn();
+      sheet.style.transform = '';
+      if (dragging && dy > 80) closeFn();
     });
-  });
+  }
 })();
+
 
 // ── Service Worker ────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -2144,7 +2174,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     .slice(0, 5);
   const repeatFavorite = hof[0] || null;
 
-  // Pies by year
+  // Pizzas by year
   const byYear = {};
   visits.forEach(v => {
     const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
@@ -2235,17 +2265,17 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedStyle ? esc(topRatedStyle.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated Style</div>
-        <div class="pp-insight-sub">${topRatedStyle ? `Avg: ${scoreLabel(topRatedStyle.avg)} · Pies: ${topRatedStyle.count}` : 'Need 3 rated pies'}</div>
+        <div class="pp-insight-sub">${topRatedStyle ? `Avg: ${scoreLabel(topRatedStyle.avg)} · Pizzas: ${topRatedStyle.count}` : 'Need 3 rated pizzas'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${ratedVisits.length ? scoreLabel(avgLife) : '—'}</div>
         <div class="pp-insight-label">Avg Rating</div>
-        <div class="pp-insight-sub">Pies rated: ${ratedVisits.length}</div>
+        <div class="pp-insight-sub">Pizzas rated: ${ratedVisits.length}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedCity ? esc(topRatedCity.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated City</div>
-        <div class="pp-insight-sub">${topRatedCity ? `Avg: ${scoreLabel(topRatedCity.avg)} · Pies: ${topRatedCity.count}` : 'Need 3 rated pies'}</div>
+        <div class="pp-insight-sub">${topRatedCity ? `Avg: ${scoreLabel(topRatedCity.avg)} · Pizzas: ${topRatedCity.count}` : 'Need 3 rated pizzas'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${explorerPct}%</div>
@@ -2255,7 +2285,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedCountry ? esc(topRatedCountry.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated Country</div>
-        <div class="pp-insight-sub">${topRatedCountry ? `Avg: ${scoreLabel(topRatedCountry.avg)} · Pies: ${topRatedCountry.count}` : 'Need 3 rated pies'}</div>
+        <div class="pp-insight-sub">${topRatedCountry ? `Avg: ${scoreLabel(topRatedCountry.avg)} · Pizzas: ${topRatedCountry.count}` : 'Need 3 rated pizzas'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${repeatFavorite ? (repeatFavorite.visitCount || 0) : '—'}</div>
@@ -2302,7 +2332,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     ` : ''}
 
     ${yearKeys.length ? `
-    <div class="pp-section-label" style="margin-top:4px;">Pies by Year</div>
+    <div class="pp-section-label" style="margin-top:4px;">Pizzas by Year</div>
     <div class="pp-card pp-year-card">
       <div class="pp-year-bars">
         ${yearKeys.map(yr => `
@@ -2344,7 +2374,7 @@ function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (
   if (!data) return '';
   const topSpot = data.topSpot;
   const topStyle = data.topStyle;
-  const pieLabel = data.visits.length === 1 ? 'pie' : 'pies';
+  const pieLabel = data.visits.length === 1 ? 'pizza' : 'pizzas';
   const spotLabel = data.spots === 1 ? 'spot' : 'spots';
   const cityLabel = data.cities === 1 ? 'city' : 'cities';
   const countryLabel = data.countries === 1 ? 'country' : 'countries';
@@ -2367,7 +2397,7 @@ function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (
     <div class="pp-yir-card">
       <div class="pp-yir-value pp-yir-name">${topStyle ? esc(topStyle.label) : '—'}</div>
       <div class="pp-yir-label">Top Rated Style</div>
-      <div class="pp-yir-sub">${topStyle ? `Avg: ${scoreLabel(topStyle.avg)} · Pies: ${topStyle.count}` : 'No style ratings this year'}</div>
+      <div class="pp-yir-sub">${topStyle ? `Avg: ${scoreLabel(topStyle.avg)} · Pizzas: ${topStyle.count}` : 'No style ratings this year'}</div>
     </div>
   `;
 }
@@ -2915,7 +2945,7 @@ function destCard(g, i) {
       <div class="dest-card-body">
         <div class="dest-card-name">${esc(g.name)}</div>
         <div class="dest-card-meta">
-          <span class="place-visit-badge" style="font-size:10px;">${g.visits.length} ${g.visits.length === 1 ? 'pie' : 'pies'}</span>
+          <span class="place-visit-badge" style="font-size:10px;">${g.visits.length} ${g.visits.length === 1 ? 'pizza' : 'pizzas'}</span>
           <span class="place-last-visit">${spots} ${spots === 1 ? 'spot' : 'spots'}</span>
         </div>
       </div>
@@ -2948,12 +2978,23 @@ async function openDestination(idx) {
     if (v.rating != null) placeMap[pid].ratings.push(v.rating);
   });
 
-  const placeList = Object.values(placeMap).sort((a, b) => b.visits.length - a.visits.length);
-  const bestRated = [...placeList].filter(p => p.ratings.length).sort((a, b) => {
-    const avgA = a.ratings.reduce((s, r) => s + r, 0) / a.ratings.length;
-    const avgB = b.ratings.reduce((s, r) => s + r, 0) / b.ratings.length;
-    return avgB - avgA;
-  })[0];
+  const placeAvg = (p) => p.ratings.length
+    ? p.ratings.reduce((s, r) => s + r, 0) / p.ratings.length
+    : -Infinity;
+  const placeLatest = (p) => Math.max(...p.visits.map(v => {
+    const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+    const t = d && !isNaN(d) ? d.getTime() : 0;
+    return t;
+  }), 0);
+
+  const placeList = Object.values(placeMap).sort((a, b) => {
+    const avgDiff = placeAvg(b) - placeAvg(a);
+    if (avgDiff) return avgDiff;
+    const visitDiff = b.visits.length - a.visits.length;
+    if (visitDiff) return visitDiff;
+    return placeLatest(b) - placeLatest(a);
+  });
+  const bestRated = [...placeList].filter(p => p.ratings.length)[0];
 
   const coverKey   = `${_destView}__${name}`;
   const coverPhoto = _destCovers[coverKey] || mine.find(v => v.photoUrl)?.photoUrl;
@@ -2971,7 +3012,7 @@ async function openDestination(idx) {
     <div class="place-stats-row" style="margin-bottom:20px;">
       <div class="place-stat-chip">
         <div class="place-stat-chip-num">${mine.length}</div>
-        <div class="place-stat-chip-label">Pies</div>
+        <div class="place-stat-chip-label">Pizzas</div>
       </div>
       <div class="place-stat-chip">
         <div class="place-stat-chip-num">${placeList.length}</div>
@@ -3042,6 +3083,6 @@ async function changeDestCover(coverKey) {
 }
 
 function closeDestination() {
-  document.getElementById('dest-detail-overlay').classList.add('hidden');
+  document.getElementById('dest-detail-overlay')?.classList.add('hidden');
 }
 

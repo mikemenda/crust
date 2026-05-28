@@ -756,6 +756,7 @@
   <!-- ─── ENTRY DETAIL OVERLAY ─────────────────────────── -->
   <div id="entry-detail-overlay" class="detail-overlay hidden">
     <div class="detail-sheet">
+      <div class="sheet-drag-handle"></div>
       <div class="detail-topbar">
         <button class="btn-icon" onclick="closeEntryDetail()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -776,6 +777,7 @@
   <!-- ─── FILTER PICKER SHEET ───────────────────────────── -->
   <div id="filter-sheet-overlay" class="filter-sheet-overlay hidden" onclick="closeFilterSheet()">
     <div class="filter-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-drag-handle"></div>
       <div class="filter-sheet-header">
         <span class="filter-sheet-title" id="filter-sheet-title">Filter</span>
         <button class="filter-sheet-clear" onclick="clearJourneyFilter()">Clear</button>
@@ -787,6 +789,7 @@
   <!-- ─── PLACE DETAIL OVERLAY ──────────────────────────── -->
   <div id="place-detail-overlay" class="place-detail-overlay hidden">
     <div class="place-detail-sheet">
+      <div class="sheet-drag-handle"></div>
       <div class="place-detail-topbar">
         <button class="btn-icon" onclick="closePlaceDetail()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -803,6 +806,7 @@
   <!-- ─── WISHLIST ADD OVERLAY ──────────────────────────── -->
   <div id="wishlist-add-overlay" class="detail-overlay hidden">
     <div class="detail-sheet">
+      <div class="sheet-drag-handle"></div>
       <div class="detail-topbar">
         <button class="btn-icon" onclick="closeWishlistAdd()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -830,6 +834,7 @@
   <!-- ─── STREAK SETTINGS OVERLAY ──────────────────────── -->
   <div id="streak-settings-overlay" class="detail-overlay hidden">
     <div class="detail-sheet">
+      <div class="sheet-drag-handle"></div>
       <div class="detail-topbar">
         <button class="btn-icon" onclick="closeStreakSettings()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -893,6 +898,7 @@
 
     <!-- ─ Pin info popup — slides up on pin tap ─ -->
     <div id="globe-pin-popup" class="globe-pin-popup hidden">
+      <div class="sheet-drag-handle"></div>
       <div class="globe-pin-popup-topbar">
         <button class="btn-icon" onclick="closeGlobePopup()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -908,6 +914,7 @@
   <!-- ─── FEED FILTER SHEET ────────────────────────────── -->
   <div id="feed-filter-sheet-overlay" class="filter-sheet-overlay hidden" onclick="closeFeedFilterSheet()">
     <div class="filter-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-drag-handle"></div>
       <div class="filter-sheet-header">
         <span class="filter-sheet-title" id="feed-filter-sheet-title">Filter</span>
         <button class="filter-sheet-clear" onclick="clearFeedFilter()">Clear</button>
@@ -919,13 +926,14 @@
   <!-- ─── DESTINATION DETAIL OVERLAY ──────────────────── -->
   <div id="dest-detail-overlay" class="place-detail-overlay hidden">
     <div class="place-detail-sheet">
+      <div class="sheet-drag-handle"></div>
       <div class="place-detail-topbar">
         <button class="btn-icon" onclick="closeDestination()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
-        <span id="dest-detail-title" style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--amber);"></span>
+        <span id="dest-detail-title" class="dest-detail-title"></span>
       </div>
       <div class="place-detail-scroll" id="dest-detail-body">
         <!-- populated by openDestination() -->

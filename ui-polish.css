@@ -3477,3 +3477,86 @@ textarea.form-input {
     transform: none !important;
   }
 }
+
+/* ============================================================
+   CRUST — V57 Clean Final Patch
+   Safe patch from V56: destination ranking, right-side closes,
+   sheet handles/dismiss affordance, last-screen restore, copy cleanup.
+   ============================================================ */
+
+/* Right-side close buttons for modal sheets/cards/popups. */
+.detail-topbar,
+.place-detail-topbar,
+.globe-pin-popup-topbar {
+  position: relative;
+}
+
+.detail-topbar > .btn-icon[aria-label="Close"],
+.place-detail-topbar > .btn-icon[aria-label="Close"],
+.globe-pin-popup-topbar > .btn-icon[aria-label="Close"] {
+  order: 10;
+  margin-left: auto;
+}
+
+.detail-topbar .detail-action-btns,
+.globe-pin-popup-topbar .btn-detail-edit {
+  order: 1;
+}
+
+/* Destination sheet title should read as the centered sheet title,
+   not as a label attached to the close button. */
+#dest-detail-title.dest-detail-title {
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--amber);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+#dest-detail-overlay .place-detail-topbar {
+  justify-content: flex-end;
+}
+
+/* Native pull affordance for sheets/popups. */
+.detail-sheet > .sheet-drag-handle,
+.place-detail-sheet > .sheet-drag-handle,
+.filter-sheet > .sheet-drag-handle,
+.globe-pin-popup > .sheet-drag-handle {
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(240,234,214,.16);
+  margin: 8px auto 0;
+  flex: 0 0 auto;
+}
+
+.filter-sheet > .sheet-drag-handle {
+  margin-top: 9px;
+  margin-bottom: 0;
+}
+
+.globe-pin-popup > .sheet-drag-handle {
+  margin-top: 7px;
+}
+
+/* Handles reduce the need for extra top padding on sheet topbars. */
+.detail-sheet > .sheet-drag-handle + .detail-topbar,
+.place-detail-sheet > .sheet-drag-handle + .place-detail-topbar,
+.globe-pin-popup > .sheet-drag-handle + .globe-pin-popup-topbar {
+  padding-top: 10px;
+}
+
+.place-stat-chip-label {
+  white-space: nowrap;
+}
+
