@@ -3547,20 +3547,11 @@ textarea.form-input {
   pointer-events: none;
 }
 
-/* Full-swipe feedback while keeping short-swipe reveals */
+/* Short-swipe reveal support */
 .swipe-wrapper,
 .bucket-swipe-wrapper {
   position: relative;
   overflow: hidden;
-}
-
-.swipe-wrapper.swipe-full-delete .swipe-reveal-delete,
-.bucket-swipe-wrapper.swipe-full-delete .swipe-reveal-delete {
-  filter: brightness(1.08);
-}
-
-.swipe-wrapper.swipe-full-edit .swipe-reveal-edit {
-  filter: brightness(1.08);
 }
 
 .swipe-wrapper .entry-card,
@@ -3573,28 +3564,4 @@ textarea.form-input {
   .bucket-swipe-wrapper .place-card {
     transition: none !important;
   }
-}
-
-/* ── V58: safer full-swipe edit/delete behavior ────────────── */
-.swipe-wrapper.swipe-full-edit .swipe-reveal-edit,
-.swipe-wrapper.swipe-full-delete .swipe-reveal-delete,
-.bucket-swipe-wrapper.swipe-full-delete .swipe-reveal-delete {
-  width: 100%;
-  opacity: 1;
-}
-
-.swipe-wrapper.swipe-full-edit .swipe-reveal-edit {
-  justify-content: flex-start;
-  padding-left: 22px;
-}
-
-.swipe-wrapper.swipe-full-delete .swipe-reveal-delete,
-.bucket-swipe-wrapper.swipe-full-delete .swipe-reveal-delete {
-  justify-content: flex-end;
-  padding-right: 22px;
-}
-
-.swipe-wrapper[data-swipe-open] .entry-card,
-.bucket-swipe-wrapper[data-swipe-open] .place-card {
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
 }
