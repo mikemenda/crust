@@ -1256,23 +1256,27 @@ function initWishlistSwipeCards() {
       deleteReveal.addEventListener('click', e => {
         e.stopPropagation();
         const placeId = wrapper.dataset.placeId;
-        card.style.transition = 'transform 0.22s ease';
-        card.style.transform = '';
+        resetSwipeWrapper(wrapper);
         deleteWishlistPlace(placeId);
       });
     }
 
-    let startX = 0, startY = 0, dx = 0;
+    let startX = 0, startY = 0, startOffset = 0, currentX = 0;
     let dragging = false, isScrolling = false;
 
     const REVEAL = 88;
-    const MENU_TRIGGER = 34;
-    const FULL_RATIO = 0.72;
+    const MENU_TRIGGER = 32;
+    const FULL_MIN = 154;
+    const FULL_RATIO = 0.46;
 
     wrapper.addEventListener('touchstart', e => {
+      if (_openSwipeWrapper && _openSwipeWrapper !== wrapper) resetAllSwipes(wrapper);
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
-      dx = 0; dragging = true; isScrolling = false;
+      startOffset = getSwipeTranslateX(card);
+      currentX = startOffset;
+      dragging = true;
+      isScrolling = false;
       card.style.transition = 'none';
       wrapper.classList.remove('swipe-full-delete');
     }, { passive: true });
@@ -1282,46 +1286,52 @@ function initWishlistSwipeCards() {
       const moveX = e.touches[0].clientX - startX;
       const moveY = e.touches[0].clientY - startY;
 
-      if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 6) {
+      if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 8) {
         isScrolling = true;
-        card.style.transition = 'transform 0.22s ease';
-        card.style.transform = '';
-        wrapper.classList.remove('swipe-full-delete');
+        resetSwipeWrapper(wrapper);
         return;
       }
 
       if (isScrolling) return;
       e.preventDefault();
 
-      dx = moveX;
       const width = Math.max(wrapper.offsetWidth || 320, 240);
-      const clamped = Math.max(-width, Math.min(0, dx));
-      const fullThreshold = width * FULL_RATIO;
+      currentX = Math.max(-width, Math.min(0, startOffset + moveX));
+      const fullThreshold = Math.min(width * FULL_RATIO, FULL_MIN);
 
-      wrapper.classList.toggle('swipe-full-delete', clamped < -fullThreshold);
-      card.style.transform = `translateX(${clamped}px)`;
+      wrapper.classList.toggle('swipe-full-delete', currentX <= -fullThreshold);
+      card.style.transform = `translateX(${currentX}px)`;
     }, { passive: false });
 
     wrapper.addEventListener('touchend', () => {
-      if (!dragging || isScrolling) { dragging = false; return; }
+      if (!dragging) return;
       dragging = false;
       card.style.transition = 'transform 0.24s ease';
-      wrapper.classList.remove('swipe-full-delete');
+
+      if (isScrolling) {
+        wrapper.classList.remove('swipe-full-delete');
+        return;
+      }
 
       const placeId = wrapper.dataset.placeId;
       const width = Math.max(wrapper.offsetWidth || 320, 240);
-      const fullThreshold = width * FULL_RATIO;
+      const fullThreshold = Math.min(width * FULL_RATIO, FULL_MIN);
 
-      if (dx <= -fullThreshold) {
+      if (currentX <= -fullThreshold) {
+        wrapper.classList.remove('swipe-full-delete');
         card.style.transform = `translateX(-${width}px)`;
+        _openSwipeWrapper = null;
         window.setTimeout(() => {
           card.style.transform = '';
           deleteWishlistPlace(placeId);
-        }, 180);
-      } else if (dx <= -MENU_TRIGGER) {
+        }, 150);
+      } else if (currentX <= -MENU_TRIGGER) {
+        wrapper.classList.remove('swipe-full-delete');
         card.style.transform = `translateX(-${REVEAL}px)`;
+        wrapper.dataset.swipeOpen = '1';
+        _openSwipeWrapper = wrapper;
       } else {
-        card.style.transform = '';
+        resetSwipeWrapper(wrapper);
       }
     });
   });
@@ -1791,15 +1801,42 @@ function compressPhoto(file, targetKB = 150) {
 // ── Swipe Gesture Handling ────────────────────────────────────
 let _openSwipeWrapper = null;
 
-function resetAllSwipes() {
-  if (_openSwipeWrapper) {
-    const card = _openSwipeWrapper.querySelector('.entry-card');
-    if (card) {
-      card.style.transition = 'transform 0.22s ease';
-      card.style.transform  = '';
-    }
-    _openSwipeWrapper = null;
+function getSwipeCard(wrapper) {
+  return wrapper?.querySelector?.('.entry-card, .place-card') || null;
+}
+
+function getSwipeTranslateX(el) {
+  if (!el) return 0;
+  const transform = window.getComputedStyle(el).transform;
+  if (!transform || transform === 'none') return 0;
+  try {
+    const matrix = new DOMMatrixReadOnly(transform);
+    return matrix.m41 || 0;
+  } catch (_) {
+    const match = transform.match(/matrix\(([^)]+)\)/);
+    if (!match) return 0;
+    const parts = match[1].split(',').map(v => parseFloat(v.trim()));
+    return Number.isFinite(parts[4]) ? parts[4] : 0;
   }
+}
+
+function resetSwipeWrapper(wrapper) {
+  if (!wrapper) return;
+  const card = getSwipeCard(wrapper);
+  if (card) {
+    card.style.transition = 'transform 0.22s ease';
+    card.style.transform = '';
+  }
+  wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
+  delete wrapper.dataset.swipeOpen;
+  if (_openSwipeWrapper === wrapper) _openSwipeWrapper = null;
+}
+
+function resetAllSwipes(except = null) {
+  document.querySelectorAll('.swipe-wrapper[data-swipe-open], .bucket-swipe-wrapper[data-swipe-open]').forEach(wrapper => {
+    if (wrapper !== except) resetSwipeWrapper(wrapper);
+  });
+  if (_openSwipeWrapper && _openSwipeWrapper !== except) resetSwipeWrapper(_openSwipeWrapper);
 }
 
 function initSwipeCards() {
@@ -1815,7 +1852,7 @@ function initSwipeCards() {
       editReveal.addEventListener('click', e => {
         e.stopPropagation();
         const entryId = wrapper.dataset.entryId;
-        resetAllSwipes();
+        resetSwipeWrapper(wrapper);
         loadAndEditEntry(entryId);
       });
     }
@@ -1824,23 +1861,27 @@ function initSwipeCards() {
       deleteReveal.addEventListener('click', e => {
         e.stopPropagation();
         const entryId = wrapper.dataset.entryId;
-        resetAllSwipes();
+        resetSwipeWrapper(wrapper);
         deleteEntryById(entryId);
       });
     }
 
-    let startX = 0, startY = 0, dx = 0;
+    let startX = 0, startY = 0, startOffset = 0, currentX = 0;
     let dragging = false, isScrolling = false;
 
     const REVEAL = 88;
-    const MENU_TRIGGER = 34;
-    const FULL_RATIO = 0.72;
+    const MENU_TRIGGER = 32;
+    const FULL_MIN = 154;
+    const FULL_RATIO = 0.46;
 
     wrapper.addEventListener('touchstart', e => {
-      if (_openSwipeWrapper && _openSwipeWrapper !== wrapper) resetAllSwipes();
+      if (_openSwipeWrapper && _openSwipeWrapper !== wrapper) resetAllSwipes(wrapper);
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
-      dx = 0; dragging = true; isScrolling = false;
+      startOffset = getSwipeTranslateX(card);
+      currentX = startOffset;
+      dragging = true;
+      isScrolling = false;
       card.style.transition = 'none';
       wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
     }, { passive: true });
@@ -1850,72 +1891,77 @@ function initSwipeCards() {
       const moveX = e.touches[0].clientX - startX;
       const moveY = e.touches[0].clientY - startY;
 
-      // If primarily vertical — it's a scroll, don't interfere
-      if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 6) {
+      // If primarily vertical — it's a scroll, don't interfere.
+      if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 8) {
         isScrolling = true;
-        card.style.transition = 'transform 0.22s ease';
-        card.style.transform  = '';
-        wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
+        resetSwipeWrapper(wrapper);
         return;
       }
 
       if (isScrolling) return;
-      e.preventDefault(); // prevent page scroll during horizontal swipe
+      e.preventDefault();
 
-      dx = moveX;
       const width = Math.max(wrapper.offsetWidth || 320, 240);
-      const clamped = Math.max(-width, Math.min(width, dx));
-      const fullThreshold = width * FULL_RATIO;
+      currentX = Math.max(-width, Math.min(width, startOffset + moveX));
+      const fullThreshold = Math.min(width * FULL_RATIO, FULL_MIN);
 
-      wrapper.classList.toggle('swipe-full-edit', clamped > fullThreshold);
-      wrapper.classList.toggle('swipe-full-delete', clamped < -fullThreshold);
-      card.style.transform = `translateX(${clamped}px)`;
+      wrapper.classList.toggle('swipe-full-edit', currentX >= fullThreshold);
+      wrapper.classList.toggle('swipe-full-delete', currentX <= -fullThreshold);
+      card.style.transform = `translateX(${currentX}px)`;
     }, { passive: false });
 
     wrapper.addEventListener('touchend', () => {
-      if (!dragging || isScrolling) { dragging = false; return; }
+      if (!dragging) return;
       dragging = false;
       card.style.transition = 'transform 0.24s ease';
-      wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
+
+      if (isScrolling) {
+        wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
+        return;
+      }
 
       const entryId = wrapper.dataset.entryId;
       const width = Math.max(wrapper.offsetWidth || 320, 240);
-      const fullThreshold = width * FULL_RATIO;
+      const fullThreshold = Math.min(width * FULL_RATIO, FULL_MIN);
 
-      if (dx <= -fullThreshold) {
-        // Full left swipe → delete after confirmation
+      if (currentX <= -fullThreshold) {
+        // Full left swipe → delete after confirmation.
+        wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
         card.style.transform = `translateX(-${width}px)`;
         _openSwipeWrapper = null;
         window.setTimeout(() => {
           card.style.transform = '';
           deleteEntryById(entryId);
-        }, 180);
-      } else if (dx >= fullThreshold) {
-        // Full right swipe → edit
+        }, 150);
+      } else if (currentX >= fullThreshold) {
+        // Full right swipe → edit.
+        wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
         card.style.transform = `translateX(${width}px)`;
         _openSwipeWrapper = null;
         window.setTimeout(() => {
           card.style.transform = '';
           loadAndEditEntry(entryId);
-        }, 180);
-      } else if (dx <= -MENU_TRIGGER) {
-        // Short left swipe → reveal delete
+        }, 150);
+      } else if (currentX <= -MENU_TRIGGER) {
+        // Short left swipe → reveal delete.
+        wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
         card.style.transform = `translateX(-${REVEAL}px)`;
+        wrapper.dataset.swipeOpen = '1';
         _openSwipeWrapper = wrapper;
-      } else if (dx >= MENU_TRIGGER) {
-        // Short right swipe → reveal edit
+      } else if (currentX >= MENU_TRIGGER) {
+        // Short right swipe → reveal edit.
+        wrapper.classList.remove('swipe-full-edit', 'swipe-full-delete');
         card.style.transform = `translateX(${REVEAL}px)`;
+        wrapper.dataset.swipeOpen = '1';
         _openSwipeWrapper = wrapper;
       } else {
-        // Partial swipe — snap back
-        card.style.transform = '';
-        _openSwipeWrapper = null;
+        resetSwipeWrapper(wrapper);
       }
     });
   });
 }
 
-// Reset any open swipe when user taps outside a card
+// Reset any open swipe when user taps outside a card.
 document.addEventListener('touchstart', e => {
   if (_openSwipeWrapper && !_openSwipeWrapper.contains(e.target)) resetAllSwipes();
 }, { passive: true });

@@ -3574,3 +3574,27 @@ textarea.form-input {
     transition: none !important;
   }
 }
+
+/* ── V58: safer full-swipe edit/delete behavior ────────────── */
+.swipe-wrapper.swipe-full-edit .swipe-reveal-edit,
+.swipe-wrapper.swipe-full-delete .swipe-reveal-delete,
+.bucket-swipe-wrapper.swipe-full-delete .swipe-reveal-delete {
+  width: 100%;
+  opacity: 1;
+}
+
+.swipe-wrapper.swipe-full-edit .swipe-reveal-edit {
+  justify-content: flex-start;
+  padding-left: 22px;
+}
+
+.swipe-wrapper.swipe-full-delete .swipe-reveal-delete,
+.bucket-swipe-wrapper.swipe-full-delete .swipe-reveal-delete {
+  justify-content: flex-end;
+  padding-right: 22px;
+}
+
+.swipe-wrapper[data-swipe-open] .entry-card,
+.bucket-swipe-wrapper[data-swipe-open] .place-card {
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+}
