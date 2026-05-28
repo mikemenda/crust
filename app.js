@@ -24,23 +24,6 @@ let _feedCurrentFilteredList = [];    // currently visible photos for swipe nav
 let _feedCurrentIdx          = 0;
 let _placeLogos              = {};    // placeId → logoUrl (cached for entry cards)
 
-// ── Screen Restore ───────────────────────────────────────────
-const MAIN_SCREEN_IDS = new Set(['home', 'journey', 'places', 'passport', 'feed']);
-
-function getSavedMainScreen() {
-  try {
-    const saved = localStorage.getItem('crust:lastScreen');
-    return MAIN_SCREEN_IDS.has(saved) ? saved : 'home';
-  } catch (_) {
-    return 'home';
-  }
-}
-
-function rememberMainScreen(id) {
-  if (!MAIN_SCREEN_IDS.has(id)) return;
-  try { localStorage.setItem('crust:lastScreen', id); } catch (_) {}
-}
-
 // ── Toast ────────────────────────────────────────────────────
 function toast(msg, type = '') {
   const el = document.getElementById('toast');
@@ -62,7 +45,6 @@ function navigate(id) {
   if (s) {
     s.classList.add('active');
     currentScreen = id;
-    rememberMainScreen(id);
 
     // Tiny final-motion pass: gives bottom-nav screen changes a subtle
     // native-feeling fade/slide without changing layout or data logic.
@@ -85,9 +67,9 @@ function navigate(id) {
   if (s) s.scrollTop = 0;
 
   // Load screen data
-  if (id === 'home')     loadHome();
-  if (id === 'journey')  loadJourney();
-  if (id === 'places')   loadPlaces();
+  if (id === 'home')    loadHome();
+  if (id === 'journey') loadJourney();
+  if (id === 'places')  loadPlaces();
   if (id === 'passport') loadPassport();
   if (id === 'feed')     loadFeed();
 }
@@ -100,7 +82,7 @@ auth.onAuthStateChanged(user => {
     document.getElementById('auth-screen').classList.remove('visible');
     document.getElementById('app').style.display = 'flex';
     renderAvatar(user);
-    navigate(getSavedMainScreen());
+    navigate('home');
   } else {
     currentUser = null;
     document.getElementById('app').style.display = 'none';
@@ -479,7 +461,7 @@ function startEditEntry() {
 
 async function confirmDeleteEntry() {
   if (!_detailVisitId) return;
-  if (!confirm('Are you sure you want to delete this entry?')) return;
+  if (!confirm('Delete this entry? This can\'t be undone.')) return;
 
   try {
     await db.collection(`users/${currentUser.uid}/visits`).doc(_detailVisitId).delete();
@@ -1251,22 +1233,9 @@ function initWishlistSwipeCards() {
     const card = wrapper.querySelector('.place-card');
     if (!card) return;
 
-    const deleteReveal = wrapper.querySelector('.bucket-delete-reveal');
-    if (deleteReveal) {
-      deleteReveal.addEventListener('click', e => {
-        e.stopPropagation();
-        const placeId = wrapper.dataset.placeId;
-        card.style.transition = 'transform 0.22s ease';
-        card.style.transform = '';
-        deleteWishlistPlace(placeId);
-      });
-    }
-
     let startX = 0, startY = 0, dx = 0;
     let dragging = false, isScrolling = false;
-
-    const REVEAL = 88;
-    const MENU_TRIGGER = 34;
+    const TRIGGER = 38;
 
     wrapper.addEventListener('touchstart', e => {
       startX = e.touches[0].clientX;
@@ -1279,19 +1248,16 @@ function initWishlistSwipeCards() {
       if (!dragging) return;
       const moveX = e.touches[0].clientX - startX;
       const moveY = e.touches[0].clientY - startY;
-
       if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 6) {
         isScrolling = true;
         card.style.transition = 'transform 0.22s ease';
         card.style.transform = '';
         return;
       }
-
       if (isScrolling) return;
       e.preventDefault();
-
       dx = moveX;
-      const clamped = Math.max(-REVEAL, Math.min(0, dx));
+      const clamped = Math.max(-56, Math.min(0, dx));
       card.style.transform = `translateX(${clamped}px)`;
     }, { passive: false });
 
@@ -1299,10 +1265,10 @@ function initWishlistSwipeCards() {
       if (!dragging || isScrolling) { dragging = false; return; }
       dragging = false;
       card.style.transition = 'transform 0.22s ease';
-
-      if (dx <= -MENU_TRIGGER) {
-        // Short left swipe → reveal delete menu only
-        card.style.transform = `translateX(-${REVEAL}px)`;
+      const placeId = wrapper.dataset.placeId;
+      if (dx < -TRIGGER) {
+        card.style.transform = '';
+        deleteWishlistPlace(placeId);
       } else {
         card.style.transform = '';
       }
@@ -1791,32 +1757,9 @@ function initSwipeCards() {
     const card = wrapper.querySelector('.entry-card');
     if (!card) return;
 
-    const editReveal = wrapper.querySelector('.swipe-reveal-edit');
-    const deleteReveal = wrapper.querySelector('.swipe-reveal-delete');
-
-    if (editReveal) {
-      editReveal.addEventListener('click', e => {
-        e.stopPropagation();
-        const entryId = wrapper.dataset.entryId;
-        resetAllSwipes();
-        loadAndEditEntry(entryId);
-      });
-    }
-
-    if (deleteReveal) {
-      deleteReveal.addEventListener('click', e => {
-        e.stopPropagation();
-        const entryId = wrapper.dataset.entryId;
-        resetAllSwipes();
-        deleteEntryById(entryId);
-      });
-    }
-
     let startX = 0, startY = 0, dx = 0;
     let dragging = false, isScrolling = false;
-
-    const REVEAL = 88;
-    const MENU_TRIGGER = 34;
+    const TRIGGER = 44; // px to trigger action
 
     wrapper.addEventListener('touchstart', e => {
       if (_openSwipeWrapper && _openSwipeWrapper !== wrapper) resetAllSwipes();
@@ -1830,7 +1773,6 @@ function initSwipeCards() {
       if (!dragging) return;
       const moveX = e.touches[0].clientX - startX;
       const moveY = e.touches[0].clientY - startY;
-
       // If primarily vertical — it's a scroll, don't interfere
       if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 6) {
         isScrolling = true;
@@ -1838,12 +1780,10 @@ function initSwipeCards() {
         card.style.transform  = '';
         return;
       }
-
       if (isScrolling) return;
       e.preventDefault(); // prevent page scroll during horizontal swipe
-
       dx = moveX;
-      const clamped = Math.max(-REVEAL, Math.min(REVEAL, dx));
+      const clamped = Math.max(-58, Math.min(58, dx));
       card.style.transform = `translateX(${clamped}px)`;
     }, { passive: false });
 
@@ -1851,15 +1791,18 @@ function initSwipeCards() {
       if (!dragging || isScrolling) { dragging = false; return; }
       dragging = false;
       card.style.transition = 'transform 0.22s ease';
+      const entryId = wrapper.dataset.entryId;
 
-      if (dx <= -MENU_TRIGGER) {
-        // Short left swipe → reveal delete menu only
-        card.style.transform = `translateX(-${REVEAL}px)`;
-        _openSwipeWrapper = wrapper;
-      } else if (dx >= MENU_TRIGGER) {
-        // Short right swipe → reveal edit menu only
-        card.style.transform = `translateX(${REVEAL}px)`;
-        _openSwipeWrapper = wrapper;
+      if (dx < -TRIGGER) {
+        // Left swipe → delete
+        card.style.transform = '';
+        _openSwipeWrapper = null;
+        deleteEntryById(entryId);
+      } else if (dx > TRIGGER) {
+        // Right swipe → edit
+        card.style.transform = '';
+        _openSwipeWrapper = null;
+        loadAndEditEntry(entryId);
       } else {
         // Partial swipe — snap back
         card.style.transform = '';
@@ -1890,7 +1833,7 @@ async function loadAndEditEntry(id) {
 
 async function deleteEntryById(id) {
   if (!currentUser) return;
-  if (!confirm('Are you sure you want to delete this entry?')) return;
+  if (!confirm('Delete this entry? This can\'t be undone.')) return;
   try {
     await db.collection(`users/${currentUser.uid}/visits`).doc(id).delete();
     toast('Entry deleted.', 'success');
@@ -1948,18 +1891,16 @@ document.getElementById('photo-area').addEventListener('click', () =>
   document.getElementById('photo-input').click()
 );
 
-// ── Swipe-down to close sheets / popups ───────────────────────
+// ── Swipe-down to close ALL overlays ─────────────────────────
 // Works from anywhere on the sheet. When scroll content is below top, normal
 // scroll happens; swipe-dismiss only fires when sheet is scrolled to the top.
 (function() {
   const overlayMap = {
-    'place-detail-overlay':       closePlaceDetail,
-    'dest-detail-overlay':        closeDestination,
-    'entry-detail-overlay':       closeEntryDetail,
-    'wishlist-add-overlay':       closeWishlistAdd,
-    'streak-settings-overlay':    closeStreakSettings,
-    'filter-sheet-overlay':       closeFilterSheet,
-    'feed-filter-sheet-overlay':  closeFeedFilterSheet,
+    'place-detail-overlay':  closePlaceDetail,
+    'dest-detail-overlay':   closeDestination,
+    'entry-detail-overlay':  closeEntryDetail,
+    'wishlist-add-overlay':  closeWishlistAdd,
+    'streak-settings-overlay': closeStreakSettings,
   };
 
   Object.entries(overlayMap).forEach(([id, closeFn]) => {
@@ -1971,55 +1912,43 @@ document.getElementById('photo-area').addEventListener('click', () =>
       if (e.target === overlay) closeFn();
     });
 
-    const sheet = overlay.querySelector('.place-detail-sheet, .detail-sheet, .filter-sheet');
-    const scrollArea = overlay.querySelector('.place-detail-scroll, .detail-scroll, .filter-options');
+    const sheet      = overlay.querySelector('.place-detail-sheet, .detail-sheet');
+    const scrollArea = overlay.querySelector('.place-detail-scroll, .detail-scroll');
     if (!sheet) return;
 
-    makeSwipeDismissible(sheet, closeFn, scrollArea);
-  });
+    let startY = 0, tracking = false;
 
-  const globePopup = document.getElementById('globe-pin-popup');
-  if (globePopup) {
-    makeSwipeDismissible(globePopup, () => {
-      if (typeof closeGlobePopup === 'function') closeGlobePopup();
-      else globePopup.classList.add('hidden');
-    }, globePopup.querySelector('.globe-pin-popup-body'));
-  }
-})();
+    sheet.addEventListener('touchstart', e => {
+      startY   = e.touches[0].clientY;
+      tracking = true;
+      sheet.style.transition = 'none';
+    }, { passive: true });
 
-function makeSwipeDismissible(sheet, closeFn, scrollArea = null) {
-  let startY = 0, tracking = false;
+    sheet.addEventListener('touchmove', e => {
+      if (!tracking) return;
+      const scrollTop = scrollArea ? scrollArea.scrollTop : 0;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 0 && scrollTop <= 1) {
+        // Dragging down at top of content — animate dismiss
+        e.preventDefault();
+        sheet.style.transform = `translateY(${Math.min(dy, 240)}px)`;
+      } else {
+        // Scrolling content — let it scroll normally
+        tracking = false;
+        sheet.style.transform = '';
+      }
+    }, { passive: false });
 
-  sheet.addEventListener('touchstart', e => {
-    startY   = e.touches[0].clientY;
-    tracking = true;
-    sheet.style.transition = 'none';
-  }, { passive: true });
-
-  sheet.addEventListener('touchmove', e => {
-    if (!tracking) return;
-    const scrollTop = scrollArea ? scrollArea.scrollTop : 0;
-    const dy = e.touches[0].clientY - startY;
-    if (dy > 0 && scrollTop <= 1) {
-      // Dragging down at top of content — animate dismiss
-      e.preventDefault();
-      sheet.style.transform = `translateY(${Math.min(dy, 240)}px)`;
-    } else {
-      // Scrolling content — let it scroll normally
+    sheet.addEventListener('touchend', e => {
+      if (!tracking) return;
       tracking = false;
-      sheet.style.transform = '';
-    }
-  }, { passive: false });
-
-  sheet.addEventListener('touchend', e => {
-    if (!tracking) return;
-    tracking = false;
-    const dy = e.changedTouches[0].clientY - startY;
-    sheet.style.transition = 'transform 0.22s ease';
-    sheet.style.transform  = '';
-    if (dy > 80) closeFn();
+      const dy = e.changedTouches[0].clientY - startY;
+      sheet.style.transition = 'transform 0.22s ease';
+      sheet.style.transform  = '';
+      if (dy > 80) closeFn();
+    });
   });
-}
+})();
 
 // ── Service Worker ────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -2306,17 +2235,17 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedStyle ? esc(topRatedStyle.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated Style</div>
-        <div class="pp-insight-sub">${topRatedStyle ? `Avg: ${scoreLabel(topRatedStyle.avg)} · Pizzas: ${topRatedStyle.count}` : 'Need 3 rated pizzas'}</div>
+        <div class="pp-insight-sub">${topRatedStyle ? `Avg: ${scoreLabel(topRatedStyle.avg)} · Pies: ${topRatedStyle.count}` : 'Need 3 rated pies'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${ratedVisits.length ? scoreLabel(avgLife) : '—'}</div>
         <div class="pp-insight-label">Avg Rating</div>
-        <div class="pp-insight-sub">Pizzas rated: ${ratedVisits.length}</div>
+        <div class="pp-insight-sub">Pies rated: ${ratedVisits.length}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedCity ? esc(topRatedCity.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated City</div>
-        <div class="pp-insight-sub">${topRatedCity ? `Avg: ${scoreLabel(topRatedCity.avg)} · Pizzas: ${topRatedCity.count}` : 'Need 3 rated pizzas'}</div>
+        <div class="pp-insight-sub">${topRatedCity ? `Avg: ${scoreLabel(topRatedCity.avg)} · Pies: ${topRatedCity.count}` : 'Need 3 rated pies'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${explorerPct}%</div>
@@ -2326,7 +2255,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
       <div class="pp-insight-card">
         <div class="pp-insight-value pp-insight-name">${topRatedCountry ? esc(topRatedCountry.label) : '—'}</div>
         <div class="pp-insight-label">Top Rated Country</div>
-        <div class="pp-insight-sub">${topRatedCountry ? `Avg: ${scoreLabel(topRatedCountry.avg)} · Pizzas: ${topRatedCountry.count}` : 'Need 3 rated pizzas'}</div>
+        <div class="pp-insight-sub">${topRatedCountry ? `Avg: ${scoreLabel(topRatedCountry.avg)} · Pies: ${topRatedCountry.count}` : 'Need 3 rated pies'}</div>
       </div>
       <div class="pp-insight-card">
         <div class="pp-insight-value">${repeatFavorite ? (repeatFavorite.visitCount || 0) : '—'}</div>
@@ -2373,7 +2302,7 @@ function renderPassportContent(visits, places, body, streak = 0, streakStartDate
     ` : ''}
 
     ${yearKeys.length ? `
-    <div class="pp-section-label" style="margin-top:4px;">Pizzas by Year</div>
+    <div class="pp-section-label" style="margin-top:4px;">Pies by Year</div>
     <div class="pp-card pp-year-card">
       <div class="pp-year-bars">
         ${yearKeys.map(yr => `
@@ -2415,13 +2344,13 @@ function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (
   if (!data) return '';
   const topSpot = data.topSpot;
   const topStyle = data.topStyle;
-  const pizzaLabel = data.visits.length === 1 ? 'pizza' : 'pizzas';
+  const pieLabel = data.visits.length === 1 ? 'pie' : 'pies';
   const spotLabel = data.spots === 1 ? 'spot' : 'spots';
   const cityLabel = data.cities === 1 ? 'city' : 'cities';
   const countryLabel = data.countries === 1 ? 'country' : 'countries';
   return `
     <div class="pp-yir-card pp-yir-snapshot">
-      <div class="pp-yir-value pp-yir-name">${data.visits.length} ${pizzaLabel} · ${data.spots} ${spotLabel}</div>
+      <div class="pp-yir-value pp-yir-name">${data.visits.length} ${pieLabel} · ${data.spots} ${spotLabel}</div>
       <div class="pp-yir-label">Pizzas</div>
       <div class="pp-yir-sub">Year in Review</div>
     </div>
@@ -2438,7 +2367,7 @@ function buildPassportYearReviewHtml(data, scoreLabel = formatRating, plural = (
     <div class="pp-yir-card">
       <div class="pp-yir-value pp-yir-name">${topStyle ? esc(topStyle.label) : '—'}</div>
       <div class="pp-yir-label">Top Rated Style</div>
-      <div class="pp-yir-sub">${topStyle ? `Avg: ${scoreLabel(topStyle.avg)} · Pizzas: ${topStyle.count}` : 'No style ratings this year'}</div>
+      <div class="pp-yir-sub">${topStyle ? `Avg: ${scoreLabel(topStyle.avg)} · Pies: ${topStyle.count}` : 'No style ratings this year'}</div>
     </div>
   `;
 }
@@ -2986,7 +2915,7 @@ function destCard(g, i) {
       <div class="dest-card-body">
         <div class="dest-card-name">${esc(g.name)}</div>
         <div class="dest-card-meta">
-          <span class="place-visit-badge" style="font-size:10px;">${g.visits.length} ${g.visits.length === 1 ? 'pizza' : 'pizzas'}</span>
+          <span class="place-visit-badge" style="font-size:10px;">${g.visits.length} ${g.visits.length === 1 ? 'pie' : 'pies'}</span>
           <span class="place-last-visit">${spots} ${spots === 1 ? 'spot' : 'spots'}</span>
         </div>
       </div>
@@ -3019,25 +2948,11 @@ async function openDestination(idx) {
     if (v.rating != null) placeMap[pid].ratings.push(v.rating);
   });
 
-  const placeList = Object.values(placeMap).sort((a, b) => {
-    const avgA = a.ratings.length ? (a.ratings.reduce((s, r) => s + Number(r), 0) / a.ratings.length) : -Infinity;
-    const avgB = b.ratings.length ? (b.ratings.reduce((s, r) => s + Number(r), 0) / b.ratings.length) : -Infinity;
-    if (avgB !== avgA) return avgB - avgA;
-    if (b.visits.length !== a.visits.length) return b.visits.length - a.visits.length;
-    const lastA = Math.max(...a.visits.map(v => {
-      const d = v.date?.toDate ? v.date.toDate() : new Date(v.date || 0);
-      return isNaN(d) ? 0 : d.getTime();
-    }));
-    const lastB = Math.max(...b.visits.map(v => {
-      const d = v.date?.toDate ? v.date.toDate() : new Date(v.date || 0);
-      return isNaN(d) ? 0 : d.getTime();
-    }));
-    return lastB - lastA;
-  });
+  const placeList = Object.values(placeMap).sort((a, b) => b.visits.length - a.visits.length);
   const bestRated = [...placeList].filter(p => p.ratings.length).sort((a, b) => {
-    const avgA = a.ratings.reduce((s, r) => s + Number(r), 0) / a.ratings.length;
-    const avgB = b.ratings.reduce((s, r) => s + Number(r), 0) / b.ratings.length;
-    return (avgB - avgA) || (b.visits.length - a.visits.length);
+    const avgA = a.ratings.reduce((s, r) => s + r, 0) / a.ratings.length;
+    const avgB = b.ratings.reduce((s, r) => s + r, 0) / b.ratings.length;
+    return avgB - avgA;
   })[0];
 
   const coverKey   = `${_destView}__${name}`;
@@ -3056,7 +2971,7 @@ async function openDestination(idx) {
     <div class="place-stats-row" style="margin-bottom:20px;">
       <div class="place-stat-chip">
         <div class="place-stat-chip-num">${mine.length}</div>
-        <div class="place-stat-chip-label">Pizzas</div>
+        <div class="place-stat-chip-label">Pies</div>
       </div>
       <div class="place-stat-chip">
         <div class="place-stat-chip-num">${placeList.length}</div>
