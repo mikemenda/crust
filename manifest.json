@@ -4,16 +4,22 @@
   "description": "Track every pie, everywhere.",
   "start_url": "/crust/",
   "display": "standalone",
-  "background_color": "#141414",
+  "background_color": "#D85A30",
   "theme_color": "#141414",
   "orientation": "portrait-primary",
   "categories": ["food", "lifestyle", "travel"],
   "icons": [
     {
+      "src": "/crust/icons/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
       "src": "/crust/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "/crust/icons/icon-512.png",
