@@ -467,6 +467,9 @@ function startEditEntry() {
   document.getElementById('entry-detail-overlay')?.classList.add('hidden');
   document.getElementById('place-detail-overlay')?.classList.add('hidden');
   navigate('log');
+
+  // Attach handler in edit mode — typing re-runs autocomplete but does NOT clear selectedPlace
+  _attachPlaceInputHandler(false);
 }
 
 async function confirmDeleteEntry() {
@@ -939,8 +942,11 @@ function setPlacesSort(sort) {
 
 // ── Place Detail ──────────────────────────────────────────────
 
+let _currentOpenPlaceId = null; // tracks which place detail is open (for edit/merge)
+
 async function openPlace(placeId) {
   if (!currentUser) return;
+  _currentOpenPlaceId = placeId;
   const overlay = document.getElementById('place-detail-overlay');
   const body    = document.getElementById('place-detail-body');
   if (!overlay || !body) return;
@@ -1051,6 +1057,7 @@ function closePlaceDetail() {
   if (!overlay) return;
   overlay.classList.add('hidden');
   overlay.style.zIndex = ''; // reset so it doesn't stay elevated
+  _currentOpenPlaceId = null;
 }
 
 // ── Log Pizza from Bucket List ────────────────────────────────
@@ -1116,6 +1123,218 @@ async function changePlaceLogo(placeId) {
     }
   };
   input.click();
+}
+
+// ── Edit Place ────────────────────────────────────────────────
+let _editingPlaceId = null;
+
+function openEditPlace() {
+  const body = document.getElementById('place-detail-body');
+  if (!body) return;
+  // Read current values from the rendered detail
+  const nameEl = body.querySelector('.place-detail-name');
+  const locEl  = body.querySelector('.place-detail-location');
+  const name   = nameEl ? nameEl.textContent.trim() : '';
+  const locStr = locEl  ? locEl.textContent.trim()  : '';
+  // Parse "City, Country" or just "Country"
+  const locParts = locStr.split(',').map(s => s.trim());
+  const city    = locParts.length >= 2 ? locParts[0] : '';
+  const country = locParts.length >= 2 ? locParts[locParts.length - 1] : locParts[0] || '';
+
+  // Store which place we're editing — read from the overlay's current open place
+  _editingPlaceId = _currentOpenPlaceId;
+  if (!_editingPlaceId) { toast('Cannot determine place — reopen and try again.', 'error'); return; }
+
+  qv('edit-place-name',    name);
+  qv('edit-place-city',    city);
+  qv('edit-place-country', country);
+
+  const btn = document.getElementById('edit-place-save-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+
+  document.getElementById('edit-place-overlay').classList.remove('hidden');
+}
+
+function closeEditPlace() {
+  document.getElementById('edit-place-overlay')?.classList.add('hidden');
+}
+
+async function saveEditPlace() {
+  if (!currentUser || !_editingPlaceId) return;
+  const newName    = document.getElementById('edit-place-name').value.trim();
+  const newCity    = document.getElementById('edit-place-city').value.trim();
+  const newCountry = document.getElementById('edit-place-country').value.trim();
+
+  if (!newName) { toast('Name cannot be empty', 'error'); return; }
+
+  const btn = document.getElementById('edit-place-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    const uid     = currentUser.uid;
+    const placeId = _editingPlaceId;
+
+    // 1. Update place doc
+    await db.collection(`users/${uid}/places`).doc(placeId).set(
+      { name: newName, city: newCity, country: newCountry },
+      { merge: true }
+    );
+
+    // 2. Update all visit docs for this place
+    const visitsSnap = await db.collection(`users/${uid}/visits`)
+      .where('placeId', '==', placeId).get();
+
+    if (!visitsSnap.empty) {
+      const CHUNK = 400; // Firestore batch limit is 500
+      const docs  = visitsSnap.docs;
+      for (let i = 0; i < docs.length; i += CHUNK) {
+        const batch = db.batch();
+        docs.slice(i, i + CHUNK).forEach(d => {
+          batch.update(d.ref, { placeName: newName, city: newCity, country: newCountry });
+        });
+        await batch.commit();
+      }
+    }
+
+    // 3. Update local cache
+    const cached = _placesAll.find(p => (p.placeId || p.id) === placeId);
+    if (cached) { cached.name = newName; cached.city = newCity; cached.country = newCountry; }
+
+    toast('Place updated ✓', 'success');
+    closeEditPlace();
+    // Reload the place detail to show updated info
+    openPlace(placeId);
+  } catch (e) {
+    console.error('saveEditPlace:', e);
+    toast('Update failed — try again.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+  }
+}
+
+// ── Merge Places ──────────────────────────────────────────────
+let _mergePrimaryPlaceId = null;
+
+function openMergePlaces() {
+  if (!_currentOpenPlaceId) { toast('Cannot determine place — reopen and try again.', 'error'); return; }
+  _mergePrimaryPlaceId = _currentOpenPlaceId;
+
+  const body    = document.getElementById('place-detail-body');
+  const nameEl  = body ? body.querySelector('.place-detail-name') : null;
+  const primName = nameEl ? nameEl.textContent.trim() : _mergePrimaryPlaceId;
+
+  document.getElementById('merge-primary-name').textContent = primName;
+
+  // Populate secondary select with all other visited places
+  const select = document.getElementById('merge-secondary-select');
+  select.innerHTML = '<option value="">Choose a place…</option>';
+  _placesAll
+    .filter(p => !p.isWishlist && (p.placeId || p.id) !== _mergePrimaryPlaceId)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    .forEach(p => {
+      const pid  = p.placeId || p.id;
+      const loc  = [p.city, p.country].filter(Boolean).join(', ');
+      const opt  = document.createElement('option');
+      opt.value  = pid;
+      opt.textContent = p.name + (loc ? ` (${loc})` : '');
+      select.appendChild(opt);
+    });
+
+  const btn = document.getElementById('merge-save-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Merge Places'; }
+
+  document.getElementById('merge-places-overlay').classList.remove('hidden');
+}
+
+function closeMergePlaces() {
+  document.getElementById('merge-places-overlay')?.classList.add('hidden');
+}
+
+async function confirmMergePlaces() {
+  if (!currentUser || !_mergePrimaryPlaceId) return;
+  const select      = document.getElementById('merge-secondary-select');
+  const secondaryId = select?.value;
+  if (!secondaryId) { toast('Choose a place to merge', 'error'); return; }
+
+  const secondaryPlace = _placesAll.find(p => (p.placeId || p.id) === secondaryId);
+  const primaryPlace   = _placesAll.find(p => (p.placeId || p.id) === _mergePrimaryPlaceId);
+
+  if (!confirm(`Merge "${secondaryPlace?.name || secondaryId}" into "${primaryPlace?.name || _mergePrimaryPlaceId}"?\n\nAll visits from the secondary place will be moved. This cannot be undone.`)) return;
+
+  const btn = document.getElementById('merge-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Merging…'; }
+
+  try {
+    const uid       = currentUser.uid;
+    const primaryId = _mergePrimaryPlaceId;
+
+    // 1. Fetch all visits from secondary place
+    const secVisits = await db.collection(`users/${uid}/visits`)
+      .where('placeId', '==', secondaryId).get();
+
+    // 2. Re-point all secondary visits to primary place
+    if (!secVisits.empty) {
+      const CHUNK = 400;
+      const docs  = secVisits.docs;
+      for (let i = 0; i < docs.length; i += CHUNK) {
+        const batch = db.batch();
+        docs.slice(i, i + CHUNK).forEach(d => {
+          batch.update(d.ref, {
+            placeId:   primaryId,
+            placeName: primaryPlace?.name || d.data().placeName,
+            city:      primaryPlace?.city    || d.data().city,
+            country:   primaryPlace?.country || d.data().country,
+          });
+        });
+        await batch.commit();
+      }
+    }
+
+    // 3. Recompute primary place stats
+    const allPrimaryVisits = await db.collection(`users/${uid}/visits`)
+      .where('placeId', '==', primaryId).get();
+    const allVisits = allPrimaryVisits.docs.map(d => d.data());
+    const ratings   = allVisits.map(v => v.rating).filter(r => r != null);
+    const ratingHistory = allVisits
+      .filter(v => v.rating != null && v.date)
+      .map(v => ({
+        date:   (v.date?.toDate ? v.date.toDate() : new Date(v.date)).toISOString().split('T')[0],
+        rating: v.rating,
+      }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Find latest visit date
+    const latestVisit = allVisits.reduce((latest, v) => {
+      const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+      return (!latest || d > latest) ? d : latest;
+    }, null);
+
+    await db.collection(`users/${uid}/places`).doc(primaryId).set({
+      visitCount:    allVisits.length,
+      ratingHistory: ratingHistory,
+      lastVisited:   latestVisit ? firebase.firestore.Timestamp.fromDate(latestVisit) : null,
+    }, { merge: true });
+
+    // 4. Delete secondary place doc
+    await db.collection(`users/${uid}/places`).doc(secondaryId).delete();
+
+    // 5. Update local cache
+    _placesAll = _placesAll.filter(p => (p.placeId || p.id) !== secondaryId);
+    const cached = _placesAll.find(p => (p.placeId || p.id) === primaryId);
+    if (cached) {
+      cached.visitCount    = allVisits.length;
+      cached.ratingHistory = ratingHistory;
+    }
+
+    toast('Places merged ✓', 'success');
+    closeMergePlaces();
+    closePlaceDetail();
+    if (currentScreen === 'places') loadPlaces();
+    else loadHome();
+  } catch (e) {
+    console.error('confirmMergePlaces:', e);
+    toast('Merge failed — try again.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Merge Places'; }
+  }
 }
 
 // ── Wishlist ──────────────────────────────────────────────────
@@ -1324,25 +1543,58 @@ function openLog() {
   resetLog();
   navigate('log');
   // Attach autocomplete listener fresh each time the form opens
+  _attachPlaceInputHandler(true); // true = clear selectedPlace on input (new entry mode)
+}
+
+function _attachPlaceInputHandler(clearOnInput) {
   const placeInput = document.getElementById('place-input');
-  if (placeInput) {
-    placeInput.oninput = function() {
-      const q = this.value.trim();
-      // Clear previous place selection and hide city/country row the moment
-      // the user edits the field — prevents the row from overlapping the dropdown
+  if (!placeInput) return;
+  placeInput.oninput = function() {
+    const q = this.value.trim();
+    if (clearOnInput) {
+      // New entry: clear selection and hide location row as user types
       selectedPlace = null;
       const locRow = document.getElementById('place-location-row');
       if (locRow) locRow.classList.remove('visible');
       qv('override-city', '');
       qv('override-country', '');
+      // Hide manual entry button once user starts typing (show autocomplete instead)
+      const manualBtn = document.getElementById('manual-entry-btn');
+      if (manualBtn) manualBtn.style.display = q.length === 0 ? '' : 'none';
+    }
+    // Always hide manual button and show autocomplete when typing
+    if (q.length >= 2) runAutocomplete(q);
+    else document.getElementById('autocomplete-list').innerHTML = '';
+  };
+}
 
-      if (q.length >= 2) runAutocomplete(q);
-      else document.getElementById('autocomplete-list').innerHTML = '';
-    };
+// Manual place entry — called when user taps "Can't find it? Enter manually"
+function useManualEntry() {
+  const val = document.getElementById('place-input').value.trim();
+  // Create a manual place record using whatever name is typed
+  selectedPlace = {
+    placeId:  'manual_' + Date.now(),
+    name:     val || 'Unknown Place',
+    address:  '',
+    city:     '',
+    country:  '',
+    lat:      null,
+    lng:      null,
+  };
+  if (val) document.getElementById('place-input').value = val;
+  document.getElementById('autocomplete-list').innerHTML = '';
+  // Hide the manual entry button once chosen
+  const btn = document.getElementById('manual-entry-btn');
+  if (btn) btn.style.display = 'none';
+  // Show city/country row for manual entry
+  const locRow = document.getElementById('place-location-row');
+  if (locRow) {
+    qv('override-city',    '');
+    qv('override-country', '');
+    locRow.classList.add('visible');
   }
 }
 
-function resetLog() {
   selectedStyles   = [];
   selectedRating   = 8.0;
   selectedPlace    = null;
@@ -1374,6 +1626,10 @@ function resetLog() {
   // Reset log title
   const logTitle = document.getElementById('log-title');
   if (logTitle) logTitle.textContent = 'Log a Pizza';
+
+  // Reset manual entry button
+  const manualBtn = document.getElementById('manual-entry-btn');
+  if (manualBtn) manualBtn.style.display = '';
 
   // Hide city/country override row
   const locRow = document.getElementById('place-location-row');
@@ -1750,6 +2006,7 @@ function compressPhoto(file, targetKB = 150) {
 
 // ── Swipe Gesture Handling ────────────────────────────────────
 let _openSwipeWrapper = null;
+let _suppressNextCardTap = false; // prevents scroll from triggering card taps on iOS
 
 function resetAllSwipes() {
   if (_openSwipeWrapper) {
@@ -1777,6 +2034,7 @@ function initSwipeCards() {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       dx = 0; dragging = true; isScrolling = false;
+      _suppressNextCardTap = false;
       card.style.transition = 'none';
     }, { passive: true });
 
@@ -1787,6 +2045,7 @@ function initSwipeCards() {
       // If primarily vertical — it's a scroll, don't interfere
       if (!isScrolling && Math.abs(moveY) > Math.abs(moveX) + 6) {
         isScrolling = true;
+        _suppressNextCardTap = true; // suppress the upcoming click
         card.style.transition = 'transform 0.22s ease';
         card.style.transform  = '';
         return;
@@ -1820,6 +2079,15 @@ function initSwipeCards() {
         _openSwipeWrapper = null;
       }
     });
+
+    // Suppress click after a scroll gesture
+    card.addEventListener('click', e => {
+      if (_suppressNextCardTap) {
+        _suppressNextCardTap = false;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+    }, true); // capture phase so it fires before the onclick attribute
   });
 }
 

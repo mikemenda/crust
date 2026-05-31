@@ -405,6 +405,7 @@
           placeholder="Search pizzeria…" autocomplete="off" autocorrect="off" spellcheck="false">
         <input type="hidden" id="place-hidden">
         <div id="autocomplete-list"></div>
+        <button type="button" id="manual-entry-btn" class="manual-entry-link" onclick="useManualEntry()">Can't find it? Enter manually</button>
         <div id="place-location-row" class="place-location-row">
           <div class="location-field">
             <span class="location-label">City</span>
@@ -437,17 +438,10 @@
       <!-- Style -->
       <div class="form-block">
         <label class="form-label">Style <span class="optional">— pick any</span></label>
-        <div class="style-grid">
-          <button class="style-chip" data-style="Al Taglio">Al Taglio</button>
-          <button class="style-chip" data-style="Deep Dish">Deep Dish</button>
-          <button class="style-chip" data-style="Detroit">Detroit</button>
-          <button class="style-chip" data-style="Neapolitan">Neapolitan</button>
-          <button class="style-chip" data-style="New York">New York</button>
-          <button class="style-chip" data-style="Pan Pizza">Pan Pizza</button>
-          <button class="style-chip" data-style="Sicilian">Sicilian</button>
-          <button class="style-chip" data-style="Tavern Style">Tavern Style</button>
-          <button class="style-chip" data-style="Other">Other</button>
-        </div>
+        <button type="button" class="style-row-trigger" onclick="openStyleSheet()">
+          <span id="style-summary" class="muted">Pick styles</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.4;flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
       </div>
 
       <!-- Photo -->
@@ -796,6 +790,10 @@
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
+        <div class="detail-action-btns">
+          <button class="btn-detail-edit" onclick="openEditPlace()" style="font-size:11px;padding:5px 10px;">Edit Place</button>
+          <button class="btn-detail-edit" onclick="openMergePlaces()" style="font-size:11px;padding:5px 10px;background:transparent;border:1px solid rgba(240,234,214,.2);color:rgba(240,234,214,.55);">Merge</button>
+        </div>
       </div>
       <div class="place-detail-scroll" id="place-detail-body">
         <!-- populated by JS -->
@@ -937,6 +935,90 @@
       </div>
       <div class="place-detail-scroll" id="dest-detail-body">
         <!-- populated by openDestination() -->
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─── STYLE PICKER SHEET ──────────────────────────────── -->
+  <div id="style-sheet-overlay" class="filter-sheet-overlay hidden" onclick="closeStyleSheet()">
+    <div class="filter-sheet style-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-drag-handle"></div>
+      <div class="filter-sheet-header">
+        <span class="filter-sheet-title">Style</span>
+        <button class="filter-sheet-clear" onclick="clearLogStyles()">Clear</button>
+      </div>
+      <div id="style-sheet-options" class="style-sheet-options"></div>
+      <div class="style-sheet-footer">
+        <button class="btn-save btn-save--compact" onclick="closeStyleSheet()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── EDIT PLACE OVERLAY ───────────────────────────────── -->
+  <div id="edit-place-overlay" class="detail-overlay hidden">
+    <div class="detail-sheet">
+      <div class="sheet-drag-handle"></div>
+      <div class="detail-topbar">
+        <button class="btn-icon" onclick="closeEditPlace()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <div class="detail-action-btns">
+          <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#C8A97E;">Edit Place</span>
+        </div>
+      </div>
+      <div class="detail-scroll" style="padding:20px 20px 48px;">
+        <p style="font-size:13px;color:rgba(240,234,214,0.45);line-height:1.65;margin-bottom:20px;">
+          Changes update the place and all its visit entries.
+        </p>
+        <div class="form-block" style="margin-bottom:14px;">
+          <label class="form-label">Name</label>
+          <input type="text" id="edit-place-name" class="form-input" placeholder="Place name" autocomplete="off">
+        </div>
+        <div class="form-block" style="margin-bottom:14px;">
+          <label class="form-label">City</label>
+          <input type="text" id="edit-place-city" class="form-input" placeholder="City">
+        </div>
+        <div class="form-block" style="margin-bottom:24px;">
+          <label class="form-label">Country</label>
+          <input type="text" id="edit-place-country" class="form-input" placeholder="Country">
+        </div>
+        <button class="btn-save" id="edit-place-save-btn" onclick="saveEditPlace()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── MERGE PLACES OVERLAY ────────────────────────────── -->
+  <div id="merge-places-overlay" class="detail-overlay hidden">
+    <div class="detail-sheet">
+      <div class="sheet-drag-handle"></div>
+      <div class="detail-topbar">
+        <button class="btn-icon" onclick="closeMergePlaces()" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <div class="detail-action-btns">
+          <span style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#C8A97E;">Merge Places</span>
+        </div>
+      </div>
+      <div class="detail-scroll" style="padding:20px 20px 48px;">
+        <p style="font-size:13px;color:rgba(240,234,214,0.45);line-height:1.65;margin-bottom:20px;">
+          All visits from the <strong style="color:rgba(240,234,214,0.7);">secondary place</strong> will move to the <strong style="color:rgba(240,234,214,0.7);">primary place</strong>, then the secondary place will be deleted.
+        </p>
+        <div class="form-block" style="margin-bottom:14px;">
+          <label class="form-label">Keep (Primary)</label>
+          <div id="merge-primary-name" style="font-size:15px;font-weight:500;color:var(--cream);padding:10px 0 4px;"></div>
+        </div>
+        <div class="form-block" style="margin-bottom:24px;">
+          <label class="form-label">Merge into it (Secondary — will be deleted)</label>
+          <select id="merge-secondary-select" class="form-input" style="background:#1e1e1e;">
+            <option value="">Choose a place…</option>
+          </select>
+        </div>
+        <button class="btn-save" id="merge-save-btn" onclick="confirmMergePlaces()" style="background:var(--terracotta);">Merge Places</button>
       </div>
     </div>
   </div>
