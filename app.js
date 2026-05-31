@@ -1595,6 +1595,7 @@ function useManualEntry() {
   }
 }
 
+function resetLog() {
   selectedStyles   = [];
   selectedRating   = 8.0;
   selectedPlace    = null;
