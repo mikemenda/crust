@@ -646,14 +646,45 @@ function closeFilterSheet() {
 
 document.getElementById('journey-search')?.addEventListener('input', function() {
   _journeySearch = this.value.trim();
+  const clearBtn = document.getElementById('journey-search-clear');
+  if (clearBtn) clearBtn.classList.toggle('hidden', !this.value);
   renderJourney();
 });
+
+function clearJourneySearch() {
+  const input = document.getElementById('journey-search');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('journey-search-clear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  _journeySearch = '';
+  renderJourney();
+}
+
+// Places search listener — attached once on DOMContentLoaded equivalent (script load)
+document.getElementById('places-search')?.addEventListener('input', function() {
+  _placesSearch = this.value.trim();
+  const clearBtn = document.getElementById('places-search-clear');
+  if (clearBtn) clearBtn.classList.toggle('hidden', !this.value);
+  if (_placesTab === 'destinations') renderDestCards();
+  else renderPlaces();
+});
+
+function clearPlacesSearch() {
+  const input = document.getElementById('places-search');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('places-search-clear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  _placesSearch = '';
+  if (_placesTab === 'destinations') renderDestCards();
+  else renderPlaces();
+}
 
 // ── Places Screen ─────────────────────────────────────────────
 
 let _placesAll  = [];
 let _placesSort = 'recent';
 let _placesTab  = 'visited';
+let _placesSearch = '';
 
 // Wishlist filter state
 let _wishlistFilters    = { city: '', country: '' };
@@ -748,6 +779,16 @@ function renderPlaces() {
   if (sortBar) sortBar.style.display = _placesTab === 'visited' ? 'flex' : 'none';
 
   let places = _placesAll.filter(p => _placesTab === 'wishlist' ? p.isWishlist : !p.isWishlist);
+
+  // Search — filters across all tabs (visited, wishlist)
+  if (_placesSearch) {
+    const q = _placesSearch.toLowerCase();
+    places = places.filter(p =>
+      (p.name    || '').toLowerCase().includes(q) ||
+      (p.city    || '').toLowerCase().includes(q) ||
+      (p.country || '').toLowerCase().includes(q)
+    );
+  }
 
   if (_placesTab === 'wishlist') {
     // Build filter opts from wishlist places
@@ -925,6 +966,12 @@ function placeCard(p) {
 
 function switchPlacesTab(tab) {
   _placesTab = tab;
+  // Reset places search on tab switch
+  _placesSearch = '';
+  const input    = document.getElementById('places-search');
+  const clearBtn = document.getElementById('places-search-clear');
+  if (input)    input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
   // Reset wishlist filters on tab switch
   if (tab !== 'wishlist') _wishlistFilters = { city: '', country: '' };
   document.querySelectorAll('.places-tab').forEach(t =>
@@ -3454,16 +3501,23 @@ function renderDestCards() {
     if (_destCovers[ck]) g.customPhoto = _destCovers[ck];
   });
 
-  if (!_destGroups.length) {
+  // Apply search filter on destination names
+  let filteredGroups = _destGroups;
+  if (_placesSearch) {
+    const q = _placesSearch.toLowerCase();
+    filteredGroups = _destGroups.filter(g => (g.name || '').toLowerCase().includes(q));
+  }
+
+  if (!filteredGroups.length) {
     feed.innerHTML = destViewToggle() + `<div class="empty-state">
-      <div class="empty-icon">🌍</div>
-      <div class="empty-title">No destinations yet</div>
-      <div class="empty-body">Log a pizza to start your pizza passport.</div>
+      <div class="empty-icon">${_placesSearch ? '🔍' : '🌍'}</div>
+      <div class="empty-title">${_placesSearch ? 'No results' : 'No destinations yet'}</div>
+      <div class="empty-body">${_placesSearch ? 'Try a different search.' : 'Log a pizza to start your pizza passport.'}</div>
     </div>`;
     return;
   }
 
-  feed.innerHTML = destViewToggle() + `<div class="dest-feed">${_destGroups.map((g, i) => destCard(g, i)).join('')}</div>`;
+  feed.innerHTML = destViewToggle() + `<div class="dest-feed">${filteredGroups.map((g, i) => destCard(g, _destGroups.indexOf(g))).join('')}</div>`;
 }
 
 function destCard(g, i) {

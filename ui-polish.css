@@ -3661,3 +3661,25 @@ textarea.form-input {
   background: rgba(255,255,255,0.07);
   color: rgba(240,234,214,0.6);
 }
+
+/* ── Search clear button ─────────────────────────────────────── */
+.search-clear-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(240,234,214,0.12);
+  color: rgba(240,234,214,0.55);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.search-clear-btn:active {
+  background: rgba(240,234,214,0.2);
+  color: var(--cream);
+}
+.search-clear-btn.hidden { display: none; }
