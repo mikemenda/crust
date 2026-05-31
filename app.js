@@ -2082,11 +2082,53 @@ async function saveEntry() {
       visit.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
       await db.collection(`users/${uid}/visits`).doc(editingVisitId).update(visit);
 
-      // Correct city/country on the place doc too
+      // Recalculate place doc from all remaining visits so avg rating,
+      // visitCount, and lastVisited always stay in sync after any edit.
       if (place.placeId) {
-        await db.collection(`users/${uid}/places`).doc(place.placeId)
-          .set({ city: finalCity, country: finalCountry }, { merge: true })
-          .catch(() => {});
+        try {
+          const allVisitsSnap = await db.collection(`users/${uid}/visits`)
+            .where('placeId', '==', place.placeId)
+            .get();
+
+          const allVisits = allVisitsSnap.docs.map(d => d.data());
+
+          const ratingHistory = allVisits
+            .filter(v => v.rating != null)
+            .map(v => {
+              const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+              return { date: d.toISOString().split('T')[0], rating: v.rating };
+            })
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+          const latestDate = allVisits.reduce((best, v) => {
+            const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+            return (!best || d > best) ? d : best;
+          }, null);
+
+          await db.collection(`users/${uid}/places`).doc(place.placeId).set({
+            name:          place.name,
+            city:          finalCity,
+            country:       finalCountry,
+            visitCount:    allVisits.length,
+            ratingHistory: ratingHistory,
+            lastVisited:   latestDate
+              ? firebase.firestore.Timestamp.fromDate(latestDate)
+              : firebase.firestore.FieldValue.delete(),
+          }, { merge: true });
+
+          // Update local cache
+          const cached = _placesAll.find(p => (p.placeId || p.id) === place.placeId);
+          if (cached) {
+            cached.name          = place.name;
+            cached.city          = finalCity;
+            cached.country       = finalCountry;
+            cached.visitCount    = allVisits.length;
+            cached.ratingHistory = ratingHistory;
+            cached.lastVisited   = latestDate || null;
+          }
+        } catch (placeErr) {
+          console.warn('[Crust] Place sync after edit failed:', placeErr);
+        }
       }
 
       toast('Entry updated! ✓', 'success');
