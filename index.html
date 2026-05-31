@@ -1006,16 +1006,18 @@
       </div>
       <div class="detail-scroll" style="padding:20px 20px 48px;">
         <p style="font-size:13px;color:rgba(240,234,214,0.45);line-height:1.65;margin-bottom:20px;">
-          All visits from the <strong style="color:rgba(240,234,214,0.7);">secondary place</strong> will move to the <strong style="color:rgba(240,234,214,0.7);">primary place</strong>, then the secondary place will be deleted.
+          All visits from the <strong style="color:rgba(240,234,214,0.7);">secondary place</strong> will move to the <strong style="color:rgba(240,234,214,0.7);">primary place</strong>, then the secondary is deleted.
         </p>
         <div class="form-block" style="margin-bottom:14px;">
           <label class="form-label">Keep (Primary)</label>
-          <div id="merge-primary-name" style="font-size:15px;font-weight:500;color:var(--cream);padding:10px 0 4px;"></div>
+          <select id="merge-primary-select" class="form-input" style="background:#1e1e1e;">
+            <option value="">Choose primary (kept)…</option>
+          </select>
         </div>
         <div class="form-block" style="margin-bottom:24px;">
-          <label class="form-label">Merge into it (Secondary — will be deleted)</label>
+          <label class="form-label">Delete (Secondary — visits move to primary)</label>
           <select id="merge-secondary-select" class="form-input" style="background:#1e1e1e;">
-            <option value="">Choose a place…</option>
+            <option value="">Choose place to delete…</option>
           </select>
         </div>
         <button class="btn-save" id="merge-save-btn" onclick="confirmMergePlaces()" style="background:var(--terracotta);">Merge Places</button>

@@ -1129,6 +1129,7 @@ textarea.form-input {
 /* Style sheet: avoid orphaned Other chip */
 #style-sheet-options .style-sheet-chip:last-child:nth-child(odd) {
   grid-column: 1 / -1;
+  justify-content: center;
 }
 .style-sheet-options {
   padding-bottom: 10px;

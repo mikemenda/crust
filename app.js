@@ -410,8 +410,8 @@ function startEditEntry() {
   const id = _detailVisitId;
   const v  = _detailVisitData;
 
-  editingVisitId = id;
   resetLog(); // clears state and resets form
+  editingVisitId = id; // MUST be set AFTER resetLog() which zeros it out
 
   // Pre-fill place
   document.getElementById('place-input').value = v.placeName || '';
@@ -1152,7 +1152,9 @@ function openEditPlace() {
   const btn = document.getElementById('edit-place-save-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
 
-  document.getElementById('edit-place-overlay').classList.remove('hidden');
+  const overlay = document.getElementById('edit-place-overlay');
+  overlay.style.zIndex = '700'; // above place-detail-overlay which is set to 620
+  overlay.classList.remove('hidden');
 }
 
 function closeEditPlace() {
@@ -1218,31 +1220,49 @@ function openMergePlaces() {
   if (!_currentOpenPlaceId) { toast('Cannot determine place — reopen and try again.', 'error'); return; }
   _mergePrimaryPlaceId = _currentOpenPlaceId;
 
-  const body    = document.getElementById('place-detail-body');
-  const nameEl  = body ? body.querySelector('.place-detail-name') : null;
-  const primName = nameEl ? nameEl.textContent.trim() : _mergePrimaryPlaceId;
+  // Populate BOTH selects with all visited places (including current)
+  const allVisited = _placesAll
+    .filter(p => !p.isWishlist)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-  document.getElementById('merge-primary-name').textContent = primName;
-
-  // Populate secondary select with all other visited places
-  const select = document.getElementById('merge-secondary-select');
-  select.innerHTML = '<option value="">Choose a place…</option>';
-  _placesAll
-    .filter(p => !p.isWishlist && (p.placeId || p.id) !== _mergePrimaryPlaceId)
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-    .forEach(p => {
-      const pid  = p.placeId || p.id;
-      const loc  = [p.city, p.country].filter(Boolean).join(', ');
-      const opt  = document.createElement('option');
-      opt.value  = pid;
-      opt.textContent = p.name + (loc ? ` (${loc})` : '');
-      select.appendChild(opt);
+  const makeopts = (excludeId) => {
+    let html = '<option value="">Choose a place…</option>';
+    allVisited.forEach(p => {
+      const pid = p.placeId || p.id;
+      if (pid === excludeId) return;
+      const loc = [p.city, p.country].filter(Boolean).join(', ');
+      html += `<option value="${pid}">${p.name}${loc ? ` (${loc})` : ''}</option>`;
     });
+    return html;
+  };
+
+  // Pre-select the current place as primary
+  const primarySelect   = document.getElementById('merge-primary-select');
+  const secondarySelect = document.getElementById('merge-secondary-select');
+
+  if (primarySelect && secondarySelect) {
+    // Populate primary with all places, pre-select current
+    let primaryHtml = '<option value="">Choose primary (kept)…</option>';
+    allVisited.forEach(p => {
+      const pid = p.placeId || p.id;
+      const loc = [p.city, p.country].filter(Boolean).join(', ');
+      primaryHtml += `<option value="${pid}" ${pid === _mergePrimaryPlaceId ? 'selected' : ''}>${p.name}${loc ? ` (${loc})` : ''}</option>`;
+    });
+    primarySelect.innerHTML = primaryHtml;
+    secondarySelect.innerHTML = makeopts(_mergePrimaryPlaceId);
+
+    // When primary changes, update secondary options to exclude chosen primary
+    primarySelect.onchange = function() {
+      secondarySelect.innerHTML = makeopts(this.value);
+    };
+  }
 
   const btn = document.getElementById('merge-save-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Merge Places'; }
 
-  document.getElementById('merge-places-overlay').classList.remove('hidden');
+  const overlay = document.getElementById('merge-places-overlay');
+  overlay.style.zIndex = '700'; // above place-detail-overlay which is set to 620
+  overlay.classList.remove('hidden');
 }
 
 function closeMergePlaces() {
@@ -1250,22 +1270,26 @@ function closeMergePlaces() {
 }
 
 async function confirmMergePlaces() {
-  if (!currentUser || !_mergePrimaryPlaceId) return;
-  const select      = document.getElementById('merge-secondary-select');
-  const secondaryId = select?.value;
-  if (!secondaryId) { toast('Choose a place to merge', 'error'); return; }
+  if (!currentUser) return;
+  const primarySelect   = document.getElementById('merge-primary-select');
+  const secondarySelect = document.getElementById('merge-secondary-select');
+  const primaryId   = primarySelect?.value;
+  const secondaryId = secondarySelect?.value;
+
+  if (!primaryId)   { toast('Choose the primary place to keep', 'error'); return; }
+  if (!secondaryId) { toast('Choose the place to merge in', 'error'); return; }
+  if (primaryId === secondaryId) { toast('Choose two different places', 'error'); return; }
 
   const secondaryPlace = _placesAll.find(p => (p.placeId || p.id) === secondaryId);
-  const primaryPlace   = _placesAll.find(p => (p.placeId || p.id) === _mergePrimaryPlaceId);
+  const primaryPlace   = _placesAll.find(p => (p.placeId || p.id) === primaryId);
 
-  if (!confirm(`Merge "${secondaryPlace?.name || secondaryId}" into "${primaryPlace?.name || _mergePrimaryPlaceId}"?\n\nAll visits from the secondary place will be moved. This cannot be undone.`)) return;
+  if (!confirm(`Merge "${secondaryPlace?.name || secondaryId}" into "${primaryPlace?.name || primaryId}"?\n\nAll visits from "${secondaryPlace?.name}" will move to "${primaryPlace?.name}", then "${secondaryPlace?.name}" will be deleted. This cannot be undone.`)) return;
 
   const btn = document.getElementById('merge-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Merging…'; }
 
   try {
-    const uid       = currentUser.uid;
-    const primaryId = _mergePrimaryPlaceId;
+    const uid = currentUser.uid;
 
     // 1. Fetch all visits from secondary place
     const secVisits = await db.collection(`users/${uid}/visits`)
@@ -1581,7 +1605,15 @@ function useManualEntry() {
     lat:      null,
     lng:      null,
   };
-  if (val) document.getElementById('place-input').value = val;
+  // Detach the autocomplete handler — typing should now just update selectedPlace.name freely
+  const placeInput = document.getElementById('place-input');
+  if (placeInput) {
+    placeInput.oninput = function() {
+      const typed = this.value.trim();
+      if (selectedPlace) selectedPlace.name = typed || 'Unknown Place';
+      document.getElementById('autocomplete-list').innerHTML = '';
+    };
+  }
   document.getElementById('autocomplete-list').innerHTML = '';
   // Hide the manual entry button once chosen
   const btn = document.getElementById('manual-entry-btn');
@@ -2061,6 +2093,7 @@ function initSwipeCards() {
     wrapper.addEventListener('touchend', () => {
       if (!dragging || isScrolling) { dragging = false; return; }
       dragging = false;
+      _suppressNextCardTap = false; // clean horizontal gesture — don't suppress tap
       card.style.transition = 'transform 0.22s ease';
       const entryId = wrapper.dataset.entryId;
 
