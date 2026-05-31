@@ -1652,6 +1652,11 @@ function resetLog() {
   const pa = document.getElementById('photo-area-inner');
   if (pa) pa.innerHTML = photoAreaDefault();
 
+  // Hide duplicate place banner
+  const dupBanner = document.getElementById('duplicate-place-banner');
+  if (dupBanner) dupBanner.classList.add('hidden');
+  _duplicateMatchPlace = null;
+
   // Reset save button (critical — fixes stuck "Saving…" bug on second entry)
   const saveBtn = document.getElementById('save-btn');
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Pizza'; }
@@ -1684,7 +1689,7 @@ document.getElementById('rating-slider').addEventListener('input', function() {
 
 // Style picker bottom sheet
 const LOG_STYLE_OPTIONS = [
-  'Al Taglio', 'Deep Dish', 'Detroit',
+  'Al Taglio', 'Artisan / Wood-Fired', 'Deep Dish', 'Detroit',
   'Neapolitan', 'New York', 'Pan Pizza',
   'Sicilian', 'Tavern Style', 'Other'
 ];
@@ -1846,6 +1851,137 @@ async function selectPlace(placeId, name, sub) {
     qv('override-country', selectedPlace.country);
     locRow.classList.add('visible');
   }
+
+  // Check if a similar place already exists in Firestore
+  _checkForSimilarPlaces(selectedPlace);
+}
+
+// ── Duplicate Place Detection ─────────────────────────────────
+// After a place is selected via autocomplete, check existing places
+// for name similarity. If a match is found, show a banner offering to
+// use the existing record (and pre-fill its avg rating + last styles).
+
+async function _checkForSimilarPlaces(newPlace) {
+  if (!currentUser || !newPlace?.name) return;
+
+  // Exact match by placeId — already the same place, pre-fill silently
+  const existingById = _placesAll.find(p =>
+    !p.isWishlist && (p.placeId || p.id) === newPlace.placeId
+  );
+  if (existingById) {
+    _prefillFromPlace(existingById);
+    return;
+  }
+
+  // Fuzzy name match: normalize both sides (lowercase, strip punctuation)
+  const normalize = s => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+  const newNorm   = normalize(newPlace.name);
+
+  const matches = _placesAll.filter(p => {
+    if (p.isWishlist) return false;
+    const pNorm = normalize(p.name);
+    return pNorm === newNorm ||
+      (newNorm.length >= 4 && pNorm.includes(newNorm)) ||
+      (pNorm.length   >= 4 && newNorm.includes(pNorm));
+  });
+
+  if (!matches.length) return;
+  _showDuplicatePlacePrompt(matches[0], newPlace);
+}
+
+function _prefillFromPlace(existingPlace) {
+  // Pre-fill rating with average (rounded to 1 decimal)
+  if (existingPlace.ratingHistory?.length) {
+    const avg     = existingPlace.ratingHistory.reduce((s, r) => s + (r.rating || 0), 0) / existingPlace.ratingHistory.length;
+    const rounded = Math.round(avg * 10) / 10;
+    selectedRating = rounded;
+    qv('rating-slider', String(rounded));
+    document.getElementById('rating-display').textContent = rounded.toFixed(1);
+  }
+
+  // Pre-fill styles from the most recent visit
+  if (existingPlace.lastStyles?.length) {
+    selectedStyles = [...existingPlace.lastStyles];
+    renderLogStyleSummary();
+    renderStyleSheetOptions();
+  } else if (currentUser && existingPlace.placeId) {
+    db.collection(`users/${currentUser.uid}/visits`)
+      .where('placeId', '==', existingPlace.placeId)
+      .orderBy('date', 'desc')
+      .limit(1)
+      .get()
+      .then(snap => {
+        if (!snap.empty) {
+          const lastStyles = snap.docs[0].data().styles || [];
+          if (lastStyles.length) {
+            selectedStyles = [...lastStyles];
+            renderLogStyleSummary();
+            renderStyleSheetOptions();
+          }
+        }
+      })
+      .catch(() => {});
+  }
+}
+
+let _duplicateMatchPlace = null;
+
+function _showDuplicatePlacePrompt(existingPlace, newPlace) {
+  _duplicateMatchPlace = existingPlace;
+
+  const avg    = existingPlace.ratingHistory?.length
+    ? existingPlace.ratingHistory.reduce((s, r) => s + (r.rating || 0), 0) / existingPlace.ratingHistory.length
+    : null;
+  const avgStr = avg !== null ? ' · avg ' + formatRating(avg) : '';
+  const vc     = existingPlace.visitCount || 0;
+  const loc    = [existingPlace.city, existingPlace.country].filter(Boolean).join(', ');
+
+  const banner = document.getElementById('duplicate-place-banner');
+  if (!banner) return;
+
+  banner.innerHTML = `
+    <div class="dup-banner-body">
+      <div class="dup-banner-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="dup-banner-text">
+        <div class="dup-banner-title">Looks like <strong>${esc(existingPlace.name)}</strong> is already in Crust</div>
+        <div class="dup-banner-sub">${vc} ${vc === 1 ? 'visit' : 'visits'}${loc ? ' · ' + esc(loc) : ''}${avgStr}</div>
+      </div>
+    </div>
+    <div class="dup-banner-actions">
+      <button class="dup-btn dup-btn--merge" onclick="_mergeDuplicatePlace()">Use existing</button>
+      <button class="dup-btn dup-btn--dismiss" onclick="_dismissDuplicateBanner()">Keep separate</button>
+    </div>
+  `;
+  banner.classList.remove('hidden');
+
+  // Always pre-fill from existing regardless of what user decides
+  _prefillFromPlace(existingPlace);
+}
+
+function _mergeDuplicatePlace() {
+  if (!_duplicateMatchPlace) return;
+  selectedPlace = {
+    placeId: _duplicateMatchPlace.placeId || _duplicateMatchPlace.id,
+    name:    _duplicateMatchPlace.name    || '',
+    address: _duplicateMatchPlace.address || '',
+    city:    _duplicateMatchPlace.city    || '',
+    country: _duplicateMatchPlace.country || '',
+    lat:     _duplicateMatchPlace.lat     ?? null,
+    lng:     _duplicateMatchPlace.lng     ?? null,
+  };
+  qv('place-input',    selectedPlace.name);
+  qv('override-city',    selectedPlace.city);
+  qv('override-country', selectedPlace.country);
+  _dismissDuplicateBanner();
+  toast('Logging to existing place \u2713', 'success');
+}
+
+function _dismissDuplicateBanner() {
+  const banner = document.getElementById('duplicate-place-banner');
+  if (banner) banner.classList.add('hidden');
+  _duplicateMatchPlace = null;
 }
 
 // ── Photo Handling ────────────────────────────────────────────
