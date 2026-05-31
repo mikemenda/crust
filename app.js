@@ -2284,7 +2284,61 @@ async function deleteEntryById(id) {
   if (!currentUser) return;
   if (!confirm('Delete this entry? This can\'t be undone.')) return;
   try {
-    await db.collection(`users/${currentUser.uid}/visits`).doc(id).delete();
+    const uid = currentUser.uid;
+
+    // Fetch the visit first so we know which place to clean up
+    const visitSnap = await db.collection(`users/${uid}/visits`).doc(id).get();
+    const placeId   = visitSnap.exists ? visitSnap.data().placeId : null;
+
+    // Delete the visit doc
+    await db.collection(`users/${uid}/visits`).doc(id).delete();
+
+    // Clean up the place doc if we have a placeId
+    if (placeId) {
+      // Fetch remaining visits for this place
+      const remaining = await db.collection(`users/${uid}/visits`)
+        .where('placeId', '==', placeId)
+        .get();
+
+      if (remaining.empty) {
+        // No visits left — delete the place entirely
+        await db.collection(`users/${uid}/places`).doc(placeId).delete().catch(() => {});
+        // Remove from local cache
+        _placesAll = _placesAll.filter(p => (p.placeId || p.id) !== placeId);
+      } else {
+        // Visits remain — recalculate visitCount, ratingHistory, lastVisited
+        const visits = remaining.docs.map(d => d.data());
+        const ratingHistory = visits
+          .filter(v => v.rating != null)
+          .map(v => {
+            const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+            return { date: d.toISOString().split('T')[0], rating: v.rating };
+          })
+          .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const latestDate = visits.reduce((best, v) => {
+          const d = v.date?.toDate ? v.date.toDate() : new Date(v.date);
+          return (!best || d > best) ? d : best;
+        }, null);
+
+        await db.collection(`users/${uid}/places`).doc(placeId).set({
+          visitCount:    visits.length,
+          ratingHistory: ratingHistory,
+          lastVisited:   latestDate
+            ? firebase.firestore.Timestamp.fromDate(latestDate)
+            : firebase.firestore.FieldValue.delete(),
+        }, { merge: true }).catch(() => {});
+
+        // Update local cache
+        const cached = _placesAll.find(p => (p.placeId || p.id) === placeId);
+        if (cached) {
+          cached.visitCount    = visits.length;
+          cached.ratingHistory = ratingHistory;
+          cached.lastVisited   = latestDate || null;
+        }
+      }
+    }
+
     toast('Entry deleted.', 'success');
     document.getElementById('entry-detail-overlay')?.classList.add('hidden');
     document.getElementById('place-detail-overlay')?.classList.add('hidden');
