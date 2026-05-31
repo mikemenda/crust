@@ -289,7 +289,7 @@ async function loadRecent(uid) {  const container = document.getElementById('rec
         </div>`;
       return;
     }
-    container.innerHTML = snap.docs.map(d => entryCard(d.id, d.data(), 'open-place')).join('');
+    container.innerHTML = snap.docs.map(d => entryCard(d.id, d.data(), 'open-entry')).join('');
     initSwipeCards();
   } catch (e) {
     console.error('loadRecent:', e);

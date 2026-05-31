@@ -9,7 +9,7 @@
 // That's the only change needed to force all devices to update.
 // ============================================================
 
-const APP_VERSION = 64; // ← bump this number on every deploy
+const APP_VERSION = 65; // ← bump this number on every deploy
 const CACHE = `crust-v${APP_VERSION}`;
 
 const PRECACHE = [
